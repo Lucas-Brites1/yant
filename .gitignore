@@ -1,0 +1,34 @@
+# Build output
+build/
+*.o
+*.obj
+*.a
+*.so
+
+# Compiled executables (sem extensão no Linux)
+/builder
+/yant
+
+# Editor / LSP / clangd
+.clangd
+.cache/
+compile_commands.json
+.vscode/
+.idea/
+
+# Valgrind core dumps
+vgcore.*
+core
+core.*
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.swp
+*~
+
+# Logs
+*.log

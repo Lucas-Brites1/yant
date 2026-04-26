@@ -1,0 +1,6 @@
+integer:x(10)
+float:y(2.2)
+string:name("Lucas")
+set:x(3)
+1 + 2 * 3
+(3 + 2) * 5

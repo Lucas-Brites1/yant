@@ -1,0 +1,16 @@
+
+integer:i(10)
+if(i <= 10, "menor ou igual a 10",
+    if(i <= 50, "menor ou igual a 50",
+        if ( i <= 100, "menor ou igual a 50", "maior que 100")
+    )
+)
+
+cond (
+    (i <= 10, "menor ou igual a 10",
+        print("i=@i");
+    ),
+    (i <= 50, "menor ou igual a 50"),
+    (i <= 100, "menor ou igual a 100"),
+    "maior que 100"
+)
