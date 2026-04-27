@@ -40,9 +40,8 @@ typedef struct {
     };
 } Value;
 
-
+void value_print(void* v);
 Value* value_alloc(YantContext* ctx, Value value);
-
 
 static inline Value  StringValue(StringSlice value) {
     return (Value) {

@@ -1,5 +1,6 @@
 #include "../include/yant_hashmap.h"
 #include "../include/logc.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 static usize next_pow2(usize n) {
@@ -107,11 +108,12 @@ bool hmap_has(Map* map, StringSlice key) {
 }
 
 void hmap_print(Map* map, void (*value_printer)(void* value)) {
+    LOG_LINE;
+    LOG_DEBUG("Map internal variables:");
     for (usize i = 0; i < map->capacity; i++) {
         if (!map->pairs[i].occupied) continue;
 
-        printf("  " SS_FMT " -> ", SS_ARG(map->pairs[i].key));
+        printf("\t\t\t\t\t\t\t| " SS_FMT " -> ", SS_ARG(map->pairs[i].key));
         value_printer(map->pairs[i].element);
-        printf("\n");
     }
 }

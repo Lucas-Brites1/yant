@@ -132,7 +132,20 @@ static Node* parse_multiplication(Parser* p);
 static Node* parse_primary(Parser* p);
 
 static Node* parse_expression(Parser* parser) {
-    return parse_and(parser);
+    return parse_or(parser);
+}
+
+static Node* parse_or(Parser* p) {
+    Node* left = parse_and(p);
+
+    while (peek(p).type == TOKEN_OR) {
+        Token op = advance(p);
+        Node* right = parse_and(p);
+
+        left = Operation(p->yant_ctx, op.type, left, right);
+    }
+
+    return left;
 }
 
 static Node* parse_and(Parser* p) {

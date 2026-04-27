@@ -78,7 +78,7 @@ void interpret(Interpreter* interpreter) {
                 LOG_DEBUG("%s", value_type_str(v.type));
                 continue;
             case VALUE_BOOL:
-                LOG_DEBUG("%s", value_type_str(v.type));
+                LOG_DEBUG("%s(%s)", value_type_str(v.type), v.as_bool ? "true" : "false");
                 continue;
             default: TODO("%s not implemented yet", value_type_str(v.type));
         }

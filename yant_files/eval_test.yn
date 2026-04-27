@@ -1,3 +1,11 @@
 // Testing evaluate simple binary operations
-boolean:state(nil == nil)
 true and true
+true and false
+false or true
+1 == 1
+1 == 1.0
+"abc" == "abc"
+nil == nil
+1 == "hello"
+integer:x(10)
+x > 5 and x < 20

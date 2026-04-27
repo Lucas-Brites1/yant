@@ -15,7 +15,7 @@ fn : fatorial({
 })(integer:num) returns integer
 
 fatorial(arg:num(5)) -> {
-  println("5! = ##num")
+  println("5! = <:num>")
 }
 
 fn : teste({

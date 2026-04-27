@@ -16,18 +16,6 @@
 #include "./include/logc.h"
 #include "./include/blobberman.h"
 
-void value_print_void(void* v) {
-    Value* val = (Value*)v;
-    switch (val->type) {
-        case VALUE_INT:    printf("%ld", val->as_int); break;
-        case VALUE_FLOAT:  printf("%f", val->as_float); break;
-        case VALUE_STRING: printf("\"" SS_FMT "\"", SS_ARG(val->as_string)); break;
-        case VALUE_BOOL:   printf("%s", val->as_bool ? "true" : "false"); break;
-        case VALUE_NIL:    printf("nil"); break;
-        default:           printf("?");
-    }
-}
-
 int main(void) {
     logc_set_level(LOGC_DEBUG);
     logc_set_show_location(true);
@@ -52,7 +40,7 @@ int main(void) {
     }
     LOG_BLANK;
     interpret(&interpreter);
-    hmap_print(&interpreter.environ, value_print_void);
+    hmap_print(&interpreter.environ, value_print);
 
     vec_free(&tokens);
     vec_free(&nodes);
