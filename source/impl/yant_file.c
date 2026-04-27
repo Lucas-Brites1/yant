@@ -1,12 +1,12 @@
 #include "../include/yant_file.h"
 #include "../include/yant_types.h"
+#include "../include/logc.h"
 #include <stdio.h>
-#include <assert.h>
 #include <stdlib.h>
 
 Source source_load(const char* filename) {
     FILE* file = fopen(filename, "r");
-    assert(file);
+    LOG_ASSERT(file, "failed while trying to load source code, make sure '%s' exists", filename);
 
     fseek(file, 0, SEEK_END);
     usize size = ftell(file);

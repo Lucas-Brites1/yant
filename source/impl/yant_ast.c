@@ -124,6 +124,6 @@ void node_print(Node* n, int depth) {
             node_print(n->as.call.callee, depth + 1);
             break;
         default:
-            fprintf(stderr, "Unknown node type: %d\n", n->type);
+            fprintf(stderr, "Unknown node type: %s\n", node_type_str(n->type));
     }
 }

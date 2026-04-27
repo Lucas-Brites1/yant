@@ -110,6 +110,7 @@ bool hmap_has(Map* map, StringSlice key) {
 void hmap_print(Map* map, void (*value_printer)(void* value)) {
     LOG_LINE;
     LOG_DEBUG("Map internal variables:");
+    if (map->count == 0) { printf("\t\t\t\t\t\t\t-> nil"); return;}
     for (usize i = 0; i < map->capacity; i++) {
         if (!map->pairs[i].occupied) continue;
 

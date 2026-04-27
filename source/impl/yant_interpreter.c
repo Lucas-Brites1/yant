@@ -173,6 +173,7 @@ static Value evaluate_comparision(TokenType op, Value vA, Value vB) {
             }
             break;
         }
+        default: UNREACHABLE();
     }
     UNREACHABLE();
 }

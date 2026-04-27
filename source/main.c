@@ -22,7 +22,7 @@ int main(void) {
     logc_set_blank_marker("$:");
 
     YantContext  ctx = yant_context_init(Kib_(50), Kib_(50), Kib_(50), Kib_(50));
-    Source      code = source_load("./yant_files/eval_test.yn");
+    Source      code = source_load("./yant_files/operations.yn");
     Vector      tokens = tokenize(&code);
 
     LOG_BLANK;
