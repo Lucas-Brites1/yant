@@ -7,10 +7,6 @@
 #include "../include/logc.h"
 #include <stdbool.h>
 
-#define TYPE_IN(actual, ...) \
-    _token_in_macro_helper((actual), (TokenType[]){__VA_ARGS__}, \
-             sizeof((TokenType[]){__VA_ARGS__}) / sizeof(TokenType))
-
 static inline Token peek(Parser* p) {
     return vec_at(Token, p->tokens, p->current);
 }
@@ -44,9 +40,10 @@ static inline bool match(Parser* p, TokenType type) {
 
 static inline Token expect(Parser* p, TokenType expected) {
     if (!check(p, expected)) {
+        Token t = peek(p);
         LOG_FATAL(
-            "expected %s, got %s at line %zu",
-            token_type_str(expected), token_type_str(peek(p).type), peek(p).line
+            "expected %s, got %s at line %zu column %zu",
+            token_type_str(expected), token_type_str(t.type), t.line, t.column
         );
     }
     return advance(p);
@@ -63,13 +60,6 @@ Parser parser_create(YantContext* yant_context, Vector* tokens) {
         .tokens   = tokens,
         .current  = 0
     };
-}
-
-static inline bool _token_in_macro_helper(TokenType actual, const TokenType* options, usize count) {
-    for (usize i = 0; i < count; i++) {
-        if (actual == options[i]) return true;
-    }
-    return false;
 }
 
 static inline bool is_type_keyword(Parser* p) {
@@ -110,6 +100,14 @@ static inline bool is_comparision_op(Parser* p) {
     );
 }
 
+static inline bool is_equality_op(Parser* p) {
+    return TYPE_IN(
+        peek(p).type,
+        TOKEN_EQEQ,
+        TOKEN_NOTEQ
+    );
+}
+
 static inline bool is_multiplication_op(Parser* p) {
     return TYPE_IN(
         peek(p).type,
@@ -125,13 +123,42 @@ static Node* parse_assignment(Parser* p);
 
 // Expression Functions
 static Node* parse_expression(Parser* p); // dispatcher
+static Node* parse_or(Parser* p);
+static Node* parse_and(Parser* p);
+static Node* parse_equality(Parser* p);
 static Node* parse_comparison(Parser* p);
 static Node* parse_addition(Parser* p);
 static Node* parse_multiplication(Parser* p);
 static Node* parse_primary(Parser* p);
 
 static Node* parse_expression(Parser* parser) {
-    return parse_comparison(parser);
+    return parse_and(parser);
+}
+
+static Node* parse_and(Parser* p) {
+    Node* left = parse_equality(p);
+
+    while (peek(p).type == TOKEN_AND) {
+        Token op = advance(p);
+        Node* right = parse_equality(p);
+
+        left = Operation(p->yant_ctx, op.type, left, right);
+    }
+
+    return left;
+}
+
+static Node* parse_equality(Parser* p) {
+    Node* left = parse_comparison(p);
+
+    while (is_equality_op(p)) {
+        Token op = advance(p);
+        Node* right = parse_comparison(p);
+
+        left = Operation(p->yant_ctx, op.type, left, right);
+    }
+
+    return left;
 }
 
 static Node* parse_comparison(Parser* p) {
@@ -178,6 +205,10 @@ static Node* parse_primary(Parser* p) {
         Token tk_identifier = advance(p);
         return Identifier(p->yant_ctx, tk_identifier.lexeme, tk_identifier.line, tk_identifier.column);
     }
+    if (check(p, TOKEN_LITERAL_NIL)) {
+        Token tk_nil = advance(p);
+        return Nil(p->yant_ctx, tk_nil.line, tk_nil.column);
+    }
     if (check(p, TOKEN_LITERAL_INTEGER)) {
         Token tk_int = advance(p);
         return LiteralInteger(p->yant_ctx, tk_int.literal.integer_value, tk_int.line, tk_int.column);
@@ -204,7 +235,6 @@ static Node* parse_primary(Parser* p) {
     LOG_FATAL("Parser: expected expression at line %zu", peek(p).line);
     return nil;
 }
-
 
 static Node* parse_statement(Parser* p) {
     if (is_type_keyword(p)) return parse_declaration(p);

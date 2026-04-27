@@ -10,45 +10,48 @@
 // | 1: Stringfied Label
 // | 2: Identifiers Matchers
 #define TOKENS_TABLE(extends) \
-    extends(TOKEN_KEYWORD_INT, "Keyword::Integer") \
-    extends(TOKEN_KEYWORD_FLOAT, "Keyword::Float") \
-    extends(TOKEN_KEYWORD_STRING, "Keyword::String") \
-    extends(TOKEN_KEYWORD_BOOLEAN, "Keyword::Boolean")\
-    extends(TOKEN_KEYWORD_SET, "Keyword::Set") \
-    extends(TOKEN_KEYWORD_FN, "Keyword::Function") \
+    extends(TOKEN_KEYWORD_NIL, "Keyword::Nil")         \
+    extends(TOKEN_KEYWORD_INT, "Keyword::Integer")     \
+    extends(TOKEN_KEYWORD_FLOAT, "Keyword::Float")     \
+    extends(TOKEN_KEYWORD_STRING, "Keyword::String")   \
+    extends(TOKEN_KEYWORD_BOOLEAN, "Keyword::Boolean") \
+    extends(TOKEN_KEYWORD_SET, "Keyword::Set")         \
+    extends(TOKEN_KEYWORD_FN, "Keyword::Function")     \
     extends(TOKEN_KEYWORD_IF, "Keyword::If-Statement") \
     \
-    extends(TOKEN_COLON, "Syntax::Colon") \
+    extends(TOKEN_COLON, "Syntax::Colon")                        \
     extends(TOKEN_RIGHT_PARENTHESES, "Syntax::RightParentheses") \
-    extends(TOKEN_LEFT_PARENTHESES, "Syntax::LeftParentheses") \
-    extends(TOKEN_SEMICOLON, "Syntax::Semicolon") \
-    extends(TOKEN_DOT, "Syntax::Dot")\
-    extends(TOKEN_COMMA, "Syntax::Comma") \
-    extends(TOKEN_LEFT_BRACE, "Syntax::LeftBrace") \
-    extends(TOKEN_RIGHT_BRACE, "Syntax::RightBrace") \
-    extends(TOKEN_LEFT_BRACKET, "Syntax::LeftBracket") \
-    extends(TOKEN_RIGHT_BRACKET, "Syntax::RightBracket") \
-    extends(TOKEN_PLUS, "Op::Plus")\
-    extends(TOKEN_MINUS, "Op::Minus") \
-    extends(TOKEN_STAR,  "Op::Star") \
-    extends(TOKEN_SLASH, "Op::Slash") \
-    extends(TOKEN_ASSIGN, "Op::Assign") \
-    extends(TOKEN_EQEQ,   "Op::Equal") \
-    extends(TOKEN_NOTEQ,  "Op::NotEqual") \
-    extends(TOKEN_NOT,    "Op::Negate") \
-    extends(TOKEN_OR,     "Op::Or") \
-    extends(TOKEN_LTE,    "Op::LessOrEqual") \
-    extends(TOKEN_LT,     "Op::Less") \
-    extends(TOKEN_GTE,    "Op::GreaterOrEqual") \
-    extends(TOKEN_GT,     "Op::Greater") \
+    extends(TOKEN_LEFT_PARENTHESES, "Syntax::LeftParentheses")   \
+    extends(TOKEN_SEMICOLON, "Syntax::Semicolon")                \
+    extends(TOKEN_DOT, "Syntax::Dot")                            \
+    extends(TOKEN_COMMA, "Syntax::Comma")                        \
+    extends(TOKEN_LEFT_BRACE, "Syntax::LeftBrace")               \
+    extends(TOKEN_RIGHT_BRACE, "Syntax::RightBrace")             \
+    extends(TOKEN_LEFT_BRACKET, "Syntax::LeftBracket")           \
+    extends(TOKEN_RIGHT_BRACKET, "Syntax::RightBracket")         \
+    extends(TOKEN_PLUS,   "Op::Plus")                            \
+    extends(TOKEN_MINUS,  "Op::Minus")                           \
+    extends(TOKEN_STAR,   "Op::Star")                            \
+    extends(TOKEN_SLASH,  "Op::Slash")                           \
+    extends(TOKEN_ASSIGN, "Op::Assign")                          \
+    extends(TOKEN_EQEQ,   "Op::Equal")                           \
+    extends(TOKEN_NOTEQ,  "Op::NotEqual")                        \
+    extends(TOKEN_NOT,    "Op::Negate")                          \
+    extends(TOKEN_LTE,    "Op::LessOrEqual")                     \
+    extends(TOKEN_LT,     "Op::Less")                            \
+    extends(TOKEN_GTE,    "Op::GreaterOrEqual")                  \
+    extends(TOKEN_GT,     "Op::Greater")                         \
+    extends(TOKEN_AND,    "Op::And")                             \
+    extends(TOKEN_OR,     "Op::Or")                              \
     \
-    extends(TOKEN_LITERAL_STRING, "Literal::String") \
+    extends(TOKEN_LITERAL_STRING, "Literal::String")   \
     extends(TOKEN_LITERAL_INTEGER, "Literal::Integer") \
-    extends(TOKEN_LITERAL_FLOAT, "Literal::Float")\
-    extends(TOKEN_LITERAL_BOOLEAN, "Literal::Boolean")\
+    extends(TOKEN_LITERAL_FLOAT, "Literal::Float")     \
+    extends(TOKEN_LITERAL_BOOLEAN, "Literal::Boolean") \
+    extends(TOKEN_LITERAL_NIL,      "Literal::Nil")    \
     \
-    extends(TOKEN_IDENTIFIER, "Ref::Identifier") \
-    extends(TOKEN_COMMENT,    "Special::Comment")\
+    extends(TOKEN_IDENTIFIER, "Ref::Identifier")       \
+    extends(TOKEN_COMMENT,    "Special::Comment")      \
     extends(TOKEN_EOF, "Special::Eof")
 
 #define X_AS_ENUM(label, str) label,
