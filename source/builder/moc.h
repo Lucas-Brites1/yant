@@ -82,6 +82,19 @@ void _moc_add_link_flags_impl(Moc* moc, const char* flags[]);
 void moc_add_include(Moc* moc, const char* include_dir);
 void moc_add_source(Moc* moc, const char* src_pattern);
 void moc_add_watch(Moc* moc, const char* pattern);
+
+/* Monitor: files that trigger a re-RUN (no rebuild) when modified.
+ * Useful for runtime data files like scripts, configs, or test inputs that
+ * the executable reads at runtime — modifying them shouldn't invalidate
+ * the build cache or trigger recompilation, just re-execution.
+ *
+ * Example: moc_add_monitor(moc, "./scripts/*.yn");
+ *   - editing a .yn file → only re-runs the binary (fast)
+ *   - editing a .c file (via add_watch/add_source) → rebuilds + re-runs
+ *
+ * Wildcards supported. Calling this multiple times appends. */
+void moc_add_monitor(Moc* moc, const char* pattern);
+
 void moc_set_output(Moc* moc, const char* out_dir, const char* exec_name);
 void moc_add_library(Moc* moc, const char* lib_name);
 void moc_add_library_path(Moc* moc, const char* lib_path);
@@ -194,7 +207,8 @@ struct Moc {
     MocCommand* link_flags;
     MocCommand* sources;
     MocCommand* objects;
-    MocCommand* watch_files;
+    MocCommand* watch_files;     /* files that trigger rebuild */
+    MocCommand* monitor_files;   /* files that trigger only re-run */
     MocCommand* active_cmd;
     MocCommand* libraries;
     MocCommand* lib_paths;
@@ -846,6 +860,7 @@ Moc* moc_begin(MocMem blob_capacity, usize max_args) {
     m->sources       = new_moc_command(blob, max_args);
     m->objects       = new_moc_command(blob, max_args);
     m->watch_files   = new_moc_command(blob, max_args);
+    m->monitor_files = new_moc_command(blob, max_args);
     m->libraries     = new_moc_command(blob, max_args);
     m->lib_paths     = new_moc_command(blob, max_args);
 
@@ -929,6 +944,21 @@ void moc_add_watch(Moc* moc, const char* pattern) {
         for (usize i = 0; i < g.gl_pathc; i++) {
             cmd_list_push(moc, moc->watch_files, g.gl_pathv[i]);
         }
+    }
+    globfree(&g);
+}
+
+void moc_add_monitor(Moc* moc, const char* pattern) {
+    if (!moc || !pattern) return;
+    char* abs_pattern = resolve_and_alloc_path(moc, pattern);
+    glob_t g;
+    if (glob(abs_pattern, GLOB_TILDE, NULL, &g) == 0) {
+        for (usize i = 0; i < g.gl_pathc; i++) {
+            cmd_list_push(moc, moc->monitor_files, g.gl_pathv[i]);
+        }
+        MOC_LOG_INFO("Monitoring %zu file(s) matching '%s'", g.gl_pathc, pattern);
+    } else {
+        MOC_LOG_WARN("No file matched monitor pattern: '%s'", pattern);
     }
     globfree(&g);
 }
@@ -1224,10 +1254,10 @@ static int moc_run_valgrind(Moc* moc) {
 
 /* === Watch loop ========================================================= */
 
-static time_t latest_mtime(Moc* moc) {
+static time_t latest_mtime_in(Moc* moc, MocCommand* list) {
     time_t max = 0;
-    for (usize i = 0; i < moc->watch_files->count; i++) {
-        char* file = cast(char*, moc->blob->start + moc->watch_files->args[i].offset);
+    for (usize i = 0; i < list->count; i++) {
+        char* file = cast(char*, moc->blob->start + list->args[i].offset);
         struct stat st;
         if (stat(file, &st) == 0 && st.st_mtime > max) max = st.st_mtime;
     }
@@ -1247,26 +1277,34 @@ typedef void (*MocOnBuildOk)(Moc* moc);
 static void moc_run_watch_loop(Moc* moc, MocOnBuildOk on_success, const char* mode_label) {
     printf(ANSI_CLEAR_SCREEN);
     MOC_LOG_INFO("Watch mode: %s. Press Ctrl+C to stop.", mode_label);
-    MOC_LOG_INFO("Watching %zu file(s).", moc->watch_files->count);
+    if (moc->monitor_files->count > 0) {
+        MOC_LOG_INFO("Watching %zu source file(s), monitoring %zu runtime file(s).",
+                     moc->watch_files->count, moc->monitor_files->count);
+    } else {
+        MOC_LOG_INFO("Watching %zu file(s).", moc->watch_files->count);
+    }
 
     time_t last_built_mtime = 0;
+    time_t last_monitor_mtime = 0;
     bool first_build = true;
     bool last_build_failed = false;
     time_t error_throttle_until = 0;
 
     while (1) {
         time_t now = time(NULL);
-        time_t max_mtime = latest_mtime(moc);
+        time_t watch_mtime = latest_mtime_in(moc, moc->watch_files);
+        time_t monitor_mtime = latest_mtime_in(moc, moc->monitor_files);
 
-        bool changed = (max_mtime > last_built_mtime) || first_build;
+        bool source_changed = (watch_mtime > last_built_mtime) || first_build;
+        bool monitor_changed = (monitor_mtime > last_monitor_mtime) && !first_build;
         bool throttled = last_build_failed && now < error_throttle_until;
 
-        if (changed && throttled) {
+        if (throttled) {
             sleep_ms(moc->watch_poll_ms);
             continue;
         }
 
-        if (changed) {
+        if (source_changed) {
             printf(ANSI_CLEAR_SCREEN);
             fflush(stdout);
 
@@ -1275,14 +1313,15 @@ static void moc_run_watch_loop(Moc* moc, MocOnBuildOk on_success, const char* mo
             } else if (last_build_failed) {
                 MOC_LOG_INFO("Retrying build...");
             } else {
-                MOC_LOG_INFO("Changes detected. Rebuilding...");
+                MOC_LOG_INFO("Source changed. Rebuilding...");
             }
 
             bool ok = moc_build_project(moc);
             first_build = false;
 
             if (ok) {
-                last_built_mtime = max_mtime;
+                last_built_mtime = watch_mtime;
+                last_monitor_mtime = monitor_mtime;  /* sync to avoid spurious re-run */
                 last_build_failed = false;
                 error_throttle_until = 0;
                 if (on_success) on_success(moc);
@@ -1294,6 +1333,12 @@ static void moc_run_watch_loop(Moc* moc, MocOnBuildOk on_success, const char* mo
                                  moc->watch_error_backoff_ms);
                 }
             }
+        } else if (monitor_changed) {
+            printf(ANSI_CLEAR_SCREEN);
+            fflush(stdout);
+            MOC_LOG_INFO("Runtime file changed. Re-running (no rebuild)...");
+            last_monitor_mtime = monitor_mtime;
+            if (on_success) on_success(moc);
         }
 
         sleep_ms(moc->watch_poll_ms);
@@ -1388,6 +1433,7 @@ void moc_dispatch(Moc* moc, int argc, char** argv) {
         MOC_LOG_INFO("  Compiler: %s", moc->compiler);
         MOC_LOG_INFO("  Sources: %zu", moc->sources->count);
         MOC_LOG_INFO("  Watch files: %zu", moc->watch_files->count);
+        MOC_LOG_INFO("  Monitor files: %zu", moc->monitor_files->count);
         MOC_LOG_INFO("  Compile flags: %zu", moc->compile_flags->count);
         MOC_LOG_INFO("  Link flags: %zu", moc->link_flags->count);
         MOC_LOG_INFO("  Libraries: %zu", moc->libraries->count);
@@ -1422,7 +1468,7 @@ void moc_dispatch(Moc* moc, int argc, char** argv) {
         MOC_LOG_INFO("  build              Build the project (default).");
         MOC_LOG_INFO("  run                Build and execute the resulting binary.");
         MOC_LOG_INFO("  valgrind | vg      Build and run under valgrind, with filtered output.");
-        MOC_LOG_INFO("  watch              Rebuild on changes; pauses on errors.");
+        MOC_LOG_INFO("  watch              Rebuild on source change; re-run on monitor change.");
         MOC_LOG_INFO("  watch+valgrind     Rebuild + run valgrind on every change.");
         MOC_LOG_INFO("                     (Aliases: 'watch+vg', 'vg+watch', 'valgrind+watch')");
         MOC_LOG_INFO("  clean              Remove the output directory and clear cache.");
@@ -1430,6 +1476,11 @@ void moc_dispatch(Moc* moc, int argc, char** argv) {
         MOC_LOG_INFO("  cache-clear        Clear only the build cache.");
         MOC_LOG_INFO("  gen-cdb            Generate compile_commands.json and .clangd.");
         MOC_LOG_INFO("  help               Show this help.");
+        MOC_LOG_INFO("");
+        MOC_LOG_INFO("Configuration helpers:");
+        MOC_LOG_INFO("  moc_add_source     - Adds .c files to compilation + watch list.");
+        MOC_LOG_INFO("  moc_add_watch      - Adds files that trigger REBUILD when modified.");
+        MOC_LOG_INFO("  moc_add_monitor    - Adds files that trigger only RE-RUN (no rebuild).");
     }
     else {
         MOC_LOG_ERROR("Unknown command: '%s'", cmd);

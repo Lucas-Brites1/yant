@@ -1,5 +1,6 @@
 #include "../include/yant_interpreter.h"
 #include "../include/yant_value.h"
+#include "../include/yant_parser.h"
 
 static inline bool at_end(Interpreter* i) {
     return i->nodes->len == i->current;
@@ -8,10 +9,10 @@ static inline bool at_end(Interpreter* i) {
 Value evaluate(Interpreter* interpreter);
 Value dispatcher(Interpreter* i, Node* n);
 
+Value find_identifier     (Interpreter* i,  Node* n);
 Value evaluate_declaration(Interpreter* i, Node* n);
-Value evaluate_assignment(Interpreter* i,  Node* n);
-Value evaluate_identifier(Interpreter* i,  Node* n);
-Value evaluate_operation(Interpreter* i,   Node* n);
+Value evaluate_assignment (Interpreter* i,  Node* n);
+Value evaluate_operation  (Interpreter* i,   Node* n);
 
 static inline Node* advance(Interpreter* i) {
     return vec_at(Node*, i->nodes, i->current++);
@@ -23,10 +24,11 @@ Value dispatcher(Interpreter* i, Node* n) {
         case NODE_LITERAL_INTEGER:   return IntegerValue(n->as.int_literal.value);
         case NODE_LITERAL_FLOAT:     return FloatValue(n->as.float_literal.value);
         case NODE_LITERAL_BOOL:      return BooleanValue(n->as.boolean_literal.value);
+        case NODE_LITERAL_NIL:       return NilValue();
         case NODE_BINARY_OP:         return evaluate_operation(i, n);
         case NODE_DECLARATION:       return evaluate_declaration(i, n);
         case NODE_ASSIGNMENT:        return evaluate_assignment(i, n);
-        case NODE_IDENTIFIER:        return evaluate_identifier(i, n);
+        case NODE_IDENTIFIER:        return find_identifier(i, n);
         default:
             LOG_DEBUG("WIP");
             return NilValue();
@@ -75,15 +77,116 @@ void interpret(Interpreter* interpreter) {
             case VALUE_NIL:
                 LOG_DEBUG("%s", value_type_str(v.type));
                 continue;
-            default: LOG_DEBUG("%s not implemented yet", value_type_str(v.type));
+            case VALUE_BOOL:
+                LOG_DEBUG("%s", value_type_str(v.type));
+                continue;
+            default: TODO("%s not implemented yet", value_type_str(v.type));
         }
     }
 }
 
+static Value evaluate_logical(Interpreter* i, Node* n) {
+    TokenType op = n->as.binary.op;
+    Value left = dispatcher(i, n->as.binary.left);
+
+    if (left.type != VALUE_BOOL) {
+            INVALID(
+                "left operand of '%s' must be boolean, got %s",
+                token_type_str(op), value_type_str(left.type)
+            );
+        }
+
+    if (op == TOKEN_AND && !left.as_bool) return BooleanValue(false);
+    if (op == TOKEN_OR  &&  left.as_bool) return BooleanValue(true);
+
+    Value right = dispatcher(i, n->as.binary.right);
+    if (right.type != VALUE_BOOL) {
+        INVALID(
+            "right operand of '%s' must be boolean, got %s",
+            token_type_str(op), value_type_str(right.type)
+        );
+    }
+
+    return BooleanValue(right.as_bool);
+}
+
+static Value evaluate_comparision(TokenType op, Value vA, Value vB) {
+    if (vA.type == VALUE_INT && vB.type == VALUE_FLOAT) vA = FloatValue((f64)vA.as_int);
+    if (vA.type == VALUE_FLOAT && vB.type == VALUE_INT) vB = FloatValue((f64)vB.as_int);
+
+    if (vA.type != vB.type) {
+        if (op == TOKEN_EQEQ)  return BooleanValue(false);
+        if (op == TOKEN_NOTEQ) return BooleanValue(true);
+        INVALID("cannot compare %s and %s with %s",value_type_str(vA.type), value_type_str(vB.type), token_type_str(op));
+    }
+
+    switch (vA.type) {
+        case VALUE_INT: {
+            switch (op) {
+                case TOKEN_LTE:   return BooleanValue(vA.as_int <= vB.as_int);
+                case TOKEN_GTE:   return BooleanValue(vA.as_int >= vB.as_int);
+                case TOKEN_LT:    return BooleanValue(vA.as_int < vB.as_int);
+                case TOKEN_GT:    return BooleanValue(vA.as_int > vB.as_int);
+                case TOKEN_EQEQ:  return BooleanValue(vA.as_int == vB.as_int);
+                case TOKEN_NOTEQ: return BooleanValue(vA.as_int != vB.as_int);
+                default: UNREACHABLE();
+            }
+            break;
+        }
+        case VALUE_FLOAT: {
+            switch (op) {
+                case TOKEN_LTE:   return BooleanValue(vA.as_float <= vB.as_float);
+                case TOKEN_GTE:   return BooleanValue(vA.as_float >= vB.as_float);
+                case TOKEN_LT:    return BooleanValue(vA.as_float < vB.as_float);
+                case TOKEN_GT:    return BooleanValue(vA.as_float > vB.as_float);
+                case TOKEN_EQEQ:  return BooleanValue(vA.as_float == vB.as_float);
+                case TOKEN_NOTEQ: return BooleanValue(vA.as_float != vB.as_float);
+                default: UNREACHABLE();
+            }
+            break;
+        }
+        case VALUE_BOOL: {
+            switch (op) {
+                case TOKEN_EQEQ:  return BooleanValue(vA.as_bool == vB.as_bool);
+                case TOKEN_NOTEQ: return BooleanValue(vA.as_bool != vB.as_bool);
+                default: UNSUPPORTED("%s unsupported type of operation between boolean values", token_type_str(op));
+            }
+            break;
+        }
+        case VALUE_STRING: {
+            switch (op) {
+                case TOKEN_LTE:   return BooleanValue( ss_cmp(vA.as_string, vB.as_string) <= 0);
+                case TOKEN_GTE:   return BooleanValue( ss_cmp(vA.as_string, vB.as_string) >= 0);
+                case TOKEN_LT:    return BooleanValue( ss_cmp(vA.as_string, vB.as_string) < 0);
+                case TOKEN_GT:    return BooleanValue( ss_cmp(vA.as_string, vB.as_string) > 0);
+                case TOKEN_EQEQ:  return BooleanValue( ss_eq(vA.as_string, vB.as_string));
+                case TOKEN_NOTEQ: return BooleanValue(!ss_eq(vA.as_string, vB.as_string));
+                default: UNREACHABLE();
+            }
+            break;
+        }
+        case VALUE_NIL: {
+            switch (op) {
+                case TOKEN_EQEQ:  return BooleanValue(true);
+                case TOKEN_NOTEQ: return BooleanValue(false);
+                default: UNSUPPORTED("ordered comparison '%s' on nil", token_type_str(op));
+            }
+            break;
+        }
+    }
+    UNREACHABLE();
+}
+
 Value evaluate_operation(Interpreter* i, Node* n) {
+    TokenType operator = n->as.binary.op;
+    if (TYPE_IN(operator, TOKEN_OR, TOKEN_AND))
+        return evaluate_logical(i, n);
+
     Value left  = dispatcher(i, n->as.binary.left);
     Value right = dispatcher(i, n->as.binary.right);
-    TokenType operator = n->as.binary.op;
+
+    if (TYPE_IN(operator, TOKEN_EQEQ, TOKEN_NOTEQ, TOKEN_GT, TOKEN_GTE, TOKEN_LT, TOKEN_LTE))
+        return evaluate_comparision(operator, left, right);
 
     if (left.type == VALUE_INT && right.type == VALUE_FLOAT) {
         left = FloatValue((f64)left.as_int);
@@ -100,11 +203,6 @@ Value evaluate_operation(Interpreter* i, Node* n) {
                 if (right.as_int == 0) LOG_FATAL("division by zero");
                 return IntegerValue(left.as_int / right.as_int);
             }
-            case TOKEN_LTE:   return BooleanValue(left.as_int <= right.as_int);
-            case TOKEN_GTE:   return BooleanValue(left.as_int >= right.as_int);
-            case TOKEN_LT:    return BooleanValue(left.as_int <  right.as_int);
-            case TOKEN_GT:    return BooleanValue(left.as_int >  right.as_int);
-            case TOKEN_EQEQ:  return BooleanValue(left.as_int == right.as_int);
 
             default:
                 LOG_FATAL("op not supported: %s", token_type_str(operator));
@@ -172,7 +270,7 @@ Value evaluate_assignment(Interpreter* i,  Node* n) {
     return NilValue();
 }
 
-Value evaluate_identifier(Interpreter* i, Node* n) {
+Value find_identifier(Interpreter* i, Node* n) {
     StringSlice identifier = n->as.identifier.name;
 
     if (!hmap_has(&i->environ, identifier)) {

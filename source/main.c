@@ -37,9 +37,9 @@ int main(void) {
     Source      code = source_load("./yant_files/eval_test.yn");
     Vector      tokens = tokenize(&code);
 
+    LOG_BLANK;
     vec_foreach(Token, tk, &tokens) {
         LOG_DEBUG("%s", token_type_str(tk->type));
-        LOG_BLANK;
     }
 
     Parser      parser = parser_create(&ctx, &tokens);

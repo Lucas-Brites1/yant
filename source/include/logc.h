@@ -14,6 +14,10 @@
  *     LOG_ERROR("failed to open '%s': %s", path, strerror(errno));
  *     LOG_FATAL("unrecoverable: %s", reason);   // also calls exit(1)
  *     LOG_BLANK();                              // visual separator (always shown)
+ *     UNREACHABLE();                            // marks impossible code paths
+ *     UNSUPPORTED("operator %s", op);           // feature not yet supported
+ *     TODO("implement string concat");          // placeholder for future work
+ *     INVALID("undeclared variable: %s", name); // user-facing input error
  *
  * Features:
  *   - 6 levels: TRACE, DEBUG, INFO, WARN, ERROR, FATAL
@@ -22,10 +26,14 @@
  *   - Runtime min-level filter (logc_set_level)
  *   - Optional log file mirror (logc_set_file)
  *   - Compile-time level cutoff via LOGC_MIN_LEVEL (zero overhead)
- *   - LOG_FATAL aborts with exit(1) automatically
+ *   - LOG_FATAL aborts with exit(1) automatically (marked noreturn)
  *   - LOG_ASSERT(cond, msg, ...) — runtime assert that logs and aborts
  *   - LOG_ONCE(level, msg, ...) — logs only on first call
  *   - LOG_BLANK() / LOG_LINE — visual section separators (ALWAYS shown)
+ *   - UNREACHABLE() — hint to compiler that code path is impossible
+ *   - UNSUPPORTED(fmt, ...) — terminates with "UNSUPPORTED:" prefix
+ *   - TODO(fmt, ...) — terminates with "TODO:" prefix
+ *   - INVALID(fmt, ...) — terminates with "INVALID:" prefix
  *   - Thread-safe when LOGC_THREAD_SAFE is defined
  */
 
@@ -55,6 +63,34 @@ typedef enum {
     LOGC_OFF   = 6
 } LogLevel;
 
+/* ---- Compiler hints ---------------------------------------------------- */
+
+/* LOGC_NORETURN: tells the compiler a function never returns.
+ * Used internally for logc_die() so LOG_FATAL is recognized as terminating. */
+#if defined(__GNUC__) || defined(__clang__)
+    #define LOGC_NORETURN __attribute__((noreturn))
+#elif defined(_MSC_VER)
+    #define LOGC_NORETURN __declspec(noreturn)
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+    #define LOGC_NORETURN _Noreturn
+#else
+    #define LOGC_NORETURN
+#endif
+
+/* UNREACHABLE(): marks a code path as impossible.
+ * If reached during execution, behavior is undefined — but in practice this
+ * lets the compiler skip warnings about missing returns and optimize better.
+ *
+ * Use after LOG_FATAL when needed, or in switch defaults that should never hit.
+ * For switch defaults that DO get hit (programmer error), prefer UNSUPPORTED. */
+#if defined(__GNUC__) || defined(__clang__)
+    #define UNREACHABLE() __builtin_unreachable()
+#elif defined(_MSC_VER)
+    #define UNREACHABLE() __assume(0)
+#else
+    #define UNREACHABLE() ((void)0)
+#endif
+
 /* ---- Configuration ---- */
 
 void logc_set_level(LogLevel level);
@@ -74,6 +110,10 @@ void logc_set_blank_marker(const char* marker);
 void logc_print(LogLevel level, const char* file, int line,
                 const char* func, const char* fmt, ...)
     __attribute__((format(printf, 5, 6)));
+
+/* Terminates the program. Marked noreturn so the compiler knows control flow
+ * stops here — that's why LOG_FATAL doesn't trigger missing-return warnings. */
+LOGC_NORETURN void logc_die(void);
 
 /* Prints a visual separator. ALWAYS prints — does NOT honor level filter,
  * because it is a structural element used to separate phases visually. */
@@ -105,11 +145,14 @@ const char* logc_level_color(LogLevel level);
 #define LOG_BLANK    logc_blank()
 #define LOG_LINE     logc_blank()
 
+/* LOG_FATAL: prints a FATAL message and terminates.
+ * Calls logc_die() which is marked noreturn — so the compiler knows control
+ * flow stops here, and no return is needed afterwards. */
 #define LOG_FATAL(fmt, ...)                                                  \
     do {                                                                     \
         logc_print(LOGC_FATAL, __FILE__, __LINE__, __func__,                 \
                    (fmt), ##__VA_ARGS__);                                    \
-        exit(1);                                                             \
+        logc_die();                                                          \
     } while (0)
 
 #define LOG_ASSERT(cond, fmt, ...)                                           \
@@ -117,7 +160,7 @@ const char* logc_level_color(LogLevel level);
         if (!(cond)) {                                                       \
             logc_print(LOGC_FATAL, __FILE__, __LINE__, __func__,             \
                        "assertion failed: " #cond " — " fmt, ##__VA_ARGS__); \
-            exit(1);                                                         \
+            logc_die();                                                      \
         }                                                                    \
     } while (0)
 
@@ -128,6 +171,52 @@ const char* logc_level_color(LogLevel level);
             _logc_once_##__LINE__ = true;                                    \
             LOGC_LOG_((level), fmt, ##__VA_ARGS__);                          \
         }                                                                    \
+    } while (0)
+
+/* ---- Diagnostic family ------------------------------------------------ */
+/*
+ * These macros all terminate the program (call logc_die). They differ only
+ * in the visual prefix, so the reader can tell apart what kind of failure
+ * occurred at a glance.
+ *
+ * Pick the one that best describes WHY execution stopped:
+ *
+ *   UNSUPPORTED(fmt, ...) — a feature is recognized but intentionally not
+ *                           supported in this version. Permanent or planned
+ *                           limitation.
+ *                           Example: UNSUPPORTED("string concatenation");
+ *
+ *   TODO(fmt, ...)        — placeholder for unfinished work. You meant to
+ *                           implement this but haven't yet.
+ *                           Example: TODO("implement closures");
+ *
+ *   INVALID(fmt, ...)     — user-facing input error. The user wrote something
+ *                           wrong (undeclared variable, type mismatch, etc).
+ *                           Example: INVALID("undeclared variable '%s'", name);
+ *
+ * All three are fatal — they call logc_die() internally. Compiler treats them
+ * as noreturn, so no `return` is needed afterwards.
+ */
+
+#define UNSUPPORTED(fmt, ...)                                                \
+    do {                                                                     \
+        logc_print(LOGC_FATAL, __FILE__, __LINE__, __func__,                 \
+                   "UNSUPPORTED: " fmt, ##__VA_ARGS__);                      \
+        logc_die();                                                          \
+    } while (0)
+
+#define TODO(fmt, ...)                                                       \
+    do {                                                                     \
+        logc_print(LOGC_FATAL, __FILE__, __LINE__, __func__,                 \
+                   "TODO: " fmt, ##__VA_ARGS__);                             \
+        logc_die();                                                          \
+    } while (0)
+
+#define INVALID(fmt, ...)                                                    \
+    do {                                                                     \
+        logc_print(LOGC_FATAL, __FILE__, __LINE__, __func__,                 \
+                   "INVALID: " fmt, ##__VA_ARGS__);                          \
+        logc_die();                                                          \
     } while (0)
 
 /* =====================================================================
@@ -204,6 +293,12 @@ static const char* logc_basename_(const char* path) {
     if (bslash) return bslash + 1;
 #endif
     return path;
+}
+
+LOGC_NORETURN void logc_die(void) {
+    fflush(stderr);
+    if (logc_extra_file_) fflush(logc_extra_file_);
+    exit(1);
 }
 
 void logc_blank(void) {
