@@ -9,7 +9,8 @@
     extends(VALUE_INT,   "Value::Integer") \
     extends(VALUE_FLOAT, "Value::Float")   \
     extends(VALUE_STRING,"Value::String")  \
-    extends(VALUE_NIL,   "Value::Nil")
+    extends(VALUE_NIL,   "Value::Nil")     \
+    extends(VALUE_BOOL,  "Value::Boolean") \
 
 #define EXTENDS_VALUE_ENUM(T, str) T,
 typedef enum {
@@ -32,9 +33,10 @@ static inline const char* value_type_str(ValueType t) {
 typedef struct {
     ValueType type;
     union {
-      i64 as_int;
-      f64 as_float;
+      i64         as_int;
+      f64         as_float;
       StringSlice as_string;
+      bool        as_bool;
     };
 } Value;
 
@@ -60,6 +62,13 @@ static inline Value  FloatValue(f64 value) {
     return (Value) {
         .type = VALUE_FLOAT,
         .as_float = value
+    };
+}
+
+static inline Value  BooleanValue(bool value) {
+    return (Value) {
+        .type = VALUE_BOOL,
+        .as_bool = value
     };
 }
 

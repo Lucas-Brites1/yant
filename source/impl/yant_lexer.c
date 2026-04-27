@@ -54,9 +54,11 @@ static TokenType identify_keyword(StringSlice lexeme) {
     if (ss_eq_cstr(lexeme, "string"))  return TOKEN_KEYWORD_STRING;
     if (ss_eq_cstr(lexeme, "integer")) return TOKEN_KEYWORD_INT;
     if (ss_eq_cstr(lexeme, "float"))   return TOKEN_KEYWORD_FLOAT;
+    if (ss_eq_cstr(lexeme, "boolean")) return TOKEN_KEYWORD_BOOLEAN;
     if (ss_eq_cstr(lexeme, "set"))     return TOKEN_KEYWORD_SET;
     if (ss_eq_cstr(lexeme, "fn"))      return TOKEN_KEYWORD_FN;
     if (ss_eq_cstr(lexeme, "if"))      return TOKEN_KEYWORD_IF;
+    if (ss_eq_cstr(lexeme, "true") || ss_eq_cstr(lexeme, "false"))    return TOKEN_LITERAL_BOOLEAN;
 
     return TOKEN_IDENTIFIER;
 }
@@ -73,7 +75,10 @@ static Token scan_identifier(Source* s) {
     usize length = s->cursor - start_cursor;
     StringSlice lexeme = { .data = s->text + start_cursor, .length = length };
 
-    return make_token(identify_keyword(lexeme), lexeme, start_line, start_column);
+    TokenType type = identify_keyword(lexeme);
+    Token     tk   = make_token(type, lexeme, start_line, start_column);
+
+    return tk;
 }
 
 static Token scan_number(Source* s) {

@@ -105,3 +105,13 @@ bool hmap_has(Map* map, StringSlice key) {
     usize idx = find_spot(map, key);
     return map->pairs[idx].occupied;
 }
+
+void hmap_print(Map* map, void (*value_printer)(void* value)) {
+    for (usize i = 0; i < map->capacity; i++) {
+        if (!map->pairs[i].occupied) continue;
+
+        printf("  " SS_FMT " -> ", SS_ARG(map->pairs[i].key));
+        value_printer(map->pairs[i].element);
+        printf("\n");
+    }
+}

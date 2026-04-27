@@ -35,6 +35,12 @@ Node* LiteralString  (YantContext* ctx, StringSlice value, usize line, usize col
     return n;
 }
 
+Node* LiteralBoolean (YantContext* ctx, bool value, usize line, usize col) {
+    Node* n = alloc_new_node(ctx->ast, NODE_LITERAL_BOOL, line, col);
+    n->as.boolean_literal.value = value;
+    return n;
+}
+
 Node* Identifier     (YantContext* ctx, StringSlice name, usize line, usize col) {
     Node* n = alloc_new_node(ctx->ast, NODE_IDENTIFIER, line, col);
     n->as.identifier.name = name;
@@ -71,12 +77,6 @@ Node* Call           (YantContext* ctx, Node* callee, Vector args, usize line, u
     return n;
 }
 
-Node* Eof           (YantContext* ctx, usize line, usize col) {
-    Node* n = alloc_new_node(ctx->ast, NODE_EOF, line, col);
-    return n;
-}
-
-
 void node_print(Node* n, int depth) {
     for (int i = 0; i < depth * 2; i++) putchar(' ');
 
@@ -90,6 +90,10 @@ void node_print(Node* n, int depth) {
         case NODE_LITERAL_STRING:
             printf("LiteralString(\"" SS_FMT "\")\n", SS_ARG(n->as.string_literal.value));
             break;
+        case NODE_LITERAL_BOOL:
+            printf("LiteralBoolean(%s)\n", n->as.boolean_literal.value ? "true" : "false");
+            break;
+
         case NODE_IDENTIFIER:
             printf("Identifier(" SS_FMT ")\n", SS_ARG(n->as.identifier.name));
             break;

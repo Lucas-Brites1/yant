@@ -77,7 +77,8 @@ static inline bool is_type_keyword(Parser* p) {
         peek(p).type,
         TOKEN_KEYWORD_STRING,
         TOKEN_KEYWORD_INT,
-        TOKEN_KEYWORD_FLOAT
+        TOKEN_KEYWORD_FLOAT,
+        TOKEN_KEYWORD_BOOLEAN
     );
 }
 
@@ -86,7 +87,7 @@ static inline bool is_statement_keyword(Parser* p) {
     return TYPE_IN(peek(p).type,
         TOKEN_KEYWORD_SET,
         TOKEN_KEYWORD_FN,
-        TOKEN_KEYWORD_IF,
+        TOKEN_KEYWORD_IF
         //TOKEN_KEYWORD_LOOP
     );
 }
@@ -99,6 +100,16 @@ static inline bool is_addition_op(Parser* p) {
     );
 }
 
+static inline bool is_comparision_op(Parser* p) {
+    return TYPE_IN(
+        peek(p).type,
+        TOKEN_GTE,
+        TOKEN_LTE,
+        TOKEN_GT,
+        TOKEN_LT
+    );
+}
+
 static inline bool is_multiplication_op(Parser* p) {
     return TYPE_IN(
         peek(p).type,
@@ -107,19 +118,6 @@ static inline bool is_multiplication_op(Parser* p) {
     );
 }
 
-static inline bool is_comparison_op(Parser* p) {
-    return TYPE_IN(
-        peek(p).type,
-        TOKEN_EQEQ,
-        TOKEN_NOTEQ,
-        TOKEN_LT,
-        TOKEN_GT,
-        TOKEN_LTE,
-        TOKEN_GTE
-    );
-}
-
-
 // Statement Functions
 static Node* parse_statement(Parser* p); // dispatcher
 static Node* parse_declaration(Parser* p);
@@ -127,12 +125,26 @@ static Node* parse_assignment(Parser* p);
 
 // Expression Functions
 static Node* parse_expression(Parser* p); // dispatcher
+static Node* parse_comparison(Parser* p);
 static Node* parse_addition(Parser* p);
 static Node* parse_multiplication(Parser* p);
 static Node* parse_primary(Parser* p);
 
 static Node* parse_expression(Parser* parser) {
-    return parse_addition(parser);
+    return parse_comparison(parser);
+}
+
+static Node* parse_comparison(Parser* p) {
+    Node* left = parse_addition(p);
+
+    while (is_comparision_op(p)) {
+        Token op = advance(p);
+        Node* right = parse_addition(p);
+
+        left = Operation(p->yant_ctx, op.type, left, right);
+    }
+
+    return left;
 }
 
 static Node* parse_addition(Parser* p) {
@@ -162,7 +174,10 @@ static Node* parse_multiplication(Parser* p) {
 }
 
 static Node* parse_primary(Parser* p) {
-
+    if (check(p, TOKEN_IDENTIFIER)) {
+        Token tk_identifier = advance(p);
+        return Identifier(p->yant_ctx, tk_identifier.lexeme, tk_identifier.line, tk_identifier.column);
+    }
     if (check(p, TOKEN_LITERAL_INTEGER)) {
         Token tk_int = advance(p);
         return LiteralInteger(p->yant_ctx, tk_int.literal.integer_value, tk_int.line, tk_int.column);
@@ -174,6 +189,10 @@ static Node* parse_primary(Parser* p) {
     if (check(p, TOKEN_LITERAL_STRING)) {
         Token tk_string = advance(p);
         return LiteralString(p->yant_ctx, tk_string.lexeme, tk_string.line, tk_string.column);
+    }
+    if (check(p, TOKEN_LITERAL_BOOLEAN)) {
+        Token tk_bool = advance(p);
+        return LiteralBoolean(p->yant_ctx, tk_bool.literal.boolean_value, tk_bool.line, tk_bool.column);
     }
     if (check(p, TOKEN_LEFT_PARENTHESES)) {
         advance(p);

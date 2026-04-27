@@ -13,6 +13,7 @@
     extends(TOKEN_KEYWORD_INT, "Keyword::Integer") \
     extends(TOKEN_KEYWORD_FLOAT, "Keyword::Float") \
     extends(TOKEN_KEYWORD_STRING, "Keyword::String") \
+    extends(TOKEN_KEYWORD_BOOLEAN, "Keyword::Boolean")\
     extends(TOKEN_KEYWORD_SET, "Keyword::Set") \
     extends(TOKEN_KEYWORD_FN, "Keyword::Function") \
     extends(TOKEN_KEYWORD_IF, "Keyword::If-Statement") \
@@ -44,6 +45,7 @@
     extends(TOKEN_LITERAL_STRING, "Literal::String") \
     extends(TOKEN_LITERAL_INTEGER, "Literal::Integer") \
     extends(TOKEN_LITERAL_FLOAT, "Literal::Float")\
+    extends(TOKEN_LITERAL_BOOLEAN, "Literal::Boolean")\
     \
     extends(TOKEN_IDENTIFIER, "Ref::Identifier") \
     extends(TOKEN_COMMENT,    "Special::Comment")\
@@ -72,8 +74,9 @@ typedef struct {
     usize column;
 
     union {
-        i64 integer_value;
-        f64 float_value;
+        i64  integer_value;
+        f64  float_value;
+        bool boolean_value;
     } literal;
 } Token;
 

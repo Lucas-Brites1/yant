@@ -42,3 +42,4 @@ bool  hmap_insert(Map* map, StringSlice key, void* element);
 bool  hmap_update(Map* map, StringSlice key, void* element);
 void* hmap_get(Map* map, StringSlice key);
 bool  hmap_has(Map* map, StringSlice key);
+void hmap_print(Map* map, void (*value_printer)(void* value));

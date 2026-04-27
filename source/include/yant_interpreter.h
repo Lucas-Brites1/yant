@@ -17,4 +17,4 @@ typedef struct {
 Interpreter interpreter_create(YantContext* yant_context, Vector* nodes);
 void        interpreter_free(Interpreter* i);
 
-Vector      interpret(Interpreter* interpreter);
+void        interpret(Interpreter* interpreter);
