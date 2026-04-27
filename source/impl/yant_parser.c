@@ -82,6 +82,14 @@ static inline bool is_statement_keyword(Parser* p) {
     );
 }
 
+static inline bool is_conditional_keyword(Parser* p) {
+    return TYPE_IN(
+        peek(p).type,
+        TOKEN_KEYWORD_IF,
+        TOKEN_KEYWORD_COND
+    );
+}
+
 static inline bool is_addition_op(Parser* p) {
     return TYPE_IN(
         peek(p).type,
@@ -120,6 +128,7 @@ static inline bool is_multiplication_op(Parser* p) {
 static Node* parse_statement(Parser* p); // dispatcher
 static Node* parse_declaration(Parser* p);
 static Node* parse_assignment(Parser* p);
+static Node* parse_conditional(Parser* p);
 
 // Expression Functions
 static Node* parse_expression(Parser* p); // dispatcher
@@ -238,6 +247,9 @@ static Node* parse_primary(Parser* p) {
         Token tk_bool = advance(p);
         return LiteralBoolean(p->yant_ctx, tk_bool.literal.boolean_value, tk_bool.line, tk_bool.column);
     }
+    if (check(p, TOKEN_KEYWORD_IF)) {
+        return parse_conditional(p);
+    }
     if (check(p, TOKEN_LEFT_PARENTHESES)) {
         advance(p);
         Node* expr = parse_addition(p);
@@ -245,13 +257,36 @@ static Node* parse_primary(Parser* p) {
         return expr;
     }
 
-    LOG_FATAL("Parser: expected expression at line %zu", peek(p).line);
+    Token t = peek(p);
+    LOG_FATAL("expected expression, got %s at line %zu column %zu",
+              token_type_str(t.type), t.line, t.column);
     return nil;
+}
+
+static Node* parse_conditional(Parser* p) {
+    Token cond_tk = advance(p);
+
+    switch (cond_tk.type) {
+        // if(conditional, then, else)
+        case TOKEN_KEYWORD_IF: {
+            expect(p, TOKEN_LEFT_PARENTHESES);
+            Node* base_cond = parse_expression(p);
+            expect(p, TOKEN_COMMA);
+            Node* then_cond = parse_expression(p);
+            expect(p, TOKEN_COMMA);
+            Node* else_cond = parse_expression(p);
+            expect(p, TOKEN_RIGHT_PARENTHESES);
+            return If(p->yant_ctx, base_cond, then_cond, else_cond, cond_tk.line, cond_tk.column);
+        }
+        case TOKEN_KEYWORD_COND: TODO();
+        default: UNREACHABLE();
+    }
 }
 
 static Node* parse_statement(Parser* p) {
     if (is_type_keyword(p)) return parse_declaration(p);
     if (is_statement_keyword(p)) {
+        if (is_conditional_keyword(p))   return parse_conditional(p);
         if (check(p, TOKEN_KEYWORD_SET)) return parse_assignment(p);
         LOG_FATAL("Unreachable code");
     }

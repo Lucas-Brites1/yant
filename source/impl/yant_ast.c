@@ -70,6 +70,14 @@ Node* Assign         (YantContext* ctx, StringSlice name, Node* value, usize lin
     return n;
 }
 
+Node* If             (YantContext* ctx, Node* base_cond, Node* then_cond, Node* else_cond, usize line, usize col) {
+    Node* n = alloc_new_node(ctx->ast, NODE_IF, line, col);
+    n->as.if_expression.base_cond = base_cond;
+    n->as.if_expression.then_cond = then_cond;
+    n->as.if_expression.else_cond = else_cond;
+    return n;
+}
+
 Node* Call           (YantContext* ctx, Node* callee, Vector args, usize line, usize col) {
     Node* n = alloc_new_node(ctx->ast, NODE_CALL, line, col);
     n->as.call.callee = callee;
@@ -84,44 +92,53 @@ Node* Nil            (YantContext* ctx, usize line, usize col) {
 
 void node_print(Node* n, int depth) {
     for (int i = 0; i < depth * 2; i++) putchar(' ');
+    NodeType t = n->type;
 
     switch (n->type) {
         case NODE_LITERAL_INTEGER:
-            printf("LiteralInteger(%ld)\n", n->as.int_literal.value);
+            printf("%s(%ld)\n", node_type_str(t), n->as.int_literal.value);
             break;
         case NODE_LITERAL_FLOAT:
-            printf("LiteralFloat(%f)\n", n->as.float_literal.value);
+            printf("%s(%f)\n", node_type_str(t), n->as.float_literal.value);
             break;
         case NODE_LITERAL_STRING:
-            printf("LiteralString(\"" SS_FMT "\")\n", SS_ARG(n->as.string_literal.value));
+            printf("%s(\"" SS_FMT "\")\n", node_type_str(t), SS_ARG(n->as.string_literal.value));
             break;
         case NODE_LITERAL_BOOL:
-            printf("LiteralBoolean(%s)\n", n->as.boolean_literal.value ? "true" : "false");
+            printf("%s(%s)\n", node_type_str(t), n->as.boolean_literal.value ? "true" : "false");
             break;
         case NODE_LITERAL_NIL:
-            printf("LiteralNil(nil)\n");
+            printf("%s(nil)\n", node_type_str(t));
             break;
         case NODE_IDENTIFIER:
-            printf("Identifier(" SS_FMT ")\n", SS_ARG(n->as.identifier.name));
+            printf("%s(" SS_FMT ")\n", node_type_str(t), SS_ARG(n->as.identifier.name));
             break;
         case NODE_BINARY_OP:
-            printf("Operation(%s)\n", token_type_str(n->as.binary.op));
+            printf("%s(%s)\n", node_type_str(t), token_type_str(n->as.binary.op));
             node_print(n->as.binary.left, depth + 1);
             node_print(n->as.binary.right, depth + 1);
             break;
         case NODE_DECLARATION:
-            printf("Declare(%s, " SS_FMT ")\n",
-                   token_type_str(n->as.declare.kind),
-                   SS_ARG(n->as.declare.name));
+            printf("%s(%s, " SS_FMT ")\n",
+                node_type_str(t),
+                token_type_str(n->as.declare.kind),
+                SS_ARG(n->as.declare.name)
+            );
             node_print(n->as.declare.value, depth + 1);
             break;
         case NODE_ASSIGNMENT:
-            printf("Assign(" SS_FMT ")\n", SS_ARG(n->as.assign.name));
+            printf("%s(" SS_FMT ")\n", node_type_str(t), SS_ARG(n->as.assign.name));
             node_print(n->as.assign.value, depth + 1);
             break;
         case NODE_CALL:
-            printf("Call\n");
+            printf("%s\n", node_type_str(t));
             node_print(n->as.call.callee, depth + 1);
+            break;
+        case NODE_IF:
+            printf("%s\n", node_type_str(t));
+            node_print(n->as.if_expression.base_cond, depth + 1);
+            node_print(n->as.if_expression.then_cond, depth + 1);
+            node_print(n->as.if_expression.else_cond, depth + 1);
             break;
         default:
             fprintf(stderr, "Unknown node type: %s\n", node_type_str(n->type));

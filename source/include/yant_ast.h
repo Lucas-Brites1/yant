@@ -16,6 +16,7 @@ typedef struct Node Node;
     extends(NODE_LITERAL_FLOAT,      "Node::LitFloat")      \
     extends(NODE_LITERAL_BOOL,       "Node::LitBoolean")    \
     extends(NODE_LITERAL_NIL,        "Node::LitNil")        \
+    extends(NODE_IF,                 "Node::If")            \
     extends(NODE_IDENTIFIER,         "Node::Identifier")    \
     extends(NODE_BINARY_OP,          "Node::BinaryOp")      \
     extends(NODE_CALL,               "Node::Call")          \
@@ -69,6 +70,13 @@ struct Node {
         } assign;
 
         struct {
+            // if(base,then,else)
+            Node* base_cond;
+            Node* then_cond;
+            Node* else_cond;
+        } if_expression;
+
+        struct {
             Node*  callee;
             Vector arguments;
         } call;
@@ -92,6 +100,7 @@ Node* Identifier     (YantContext* ctx, StringSlice name, usize line, usize col)
 Node* Operation      (YantContext* ctx, TokenType op, Node* left, Node* right);
 Node* Declare        (YantContext* ctx, TokenType kind, StringSlice name, Node* value, usize line, usize col);
 Node* Assign         (YantContext* ctx, StringSlice name, Node* value, usize line, usize col);
+Node* If             (YantContext* ctx, Node* base_cond, Node* then_cond, Node* else_cond, usize line, usize col);
 Node* Call           (YantContext* ctx, Node* callee, Vector args, usize line, usize col);
 Node* Nil            (YantContext* ctx, usize line, usize col);
 Node* Eof            (YantContext* ctx, usize line, usize col);

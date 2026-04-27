@@ -58,6 +58,7 @@ static TokenType identify_keyword(StringSlice lexeme) {
     if (ss_eq_cstr(lexeme, "set"))     return TOKEN_KEYWORD_SET;
     if (ss_eq_cstr(lexeme, "fn"))      return TOKEN_KEYWORD_FN;
     if (ss_eq_cstr(lexeme, "if"))      return TOKEN_KEYWORD_IF;
+    if (ss_eq_cstr(lexeme, "cond"))    return TOKEN_KEYWORD_COND;
     if (ss_eq_cstr(lexeme, "and"))     return TOKEN_AND;
     if (ss_eq_cstr(lexeme, "or"))      return TOKEN_OR;
     if (ss_eq_cstr(lexeme, "nil"))     return TOKEN_LITERAL_NIL;

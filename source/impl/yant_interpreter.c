@@ -271,6 +271,10 @@ Value evaluate_assignment(Interpreter* i,  Node* n) {
     return NilValue();
 }
 
+Value evaluate_conditional(Interpreter* i, Node* n) {
+TODO();
+}
+
 Value find_identifier(Interpreter* i, Node* n) {
     StringSlice identifier = n->as.identifier.name;
 
