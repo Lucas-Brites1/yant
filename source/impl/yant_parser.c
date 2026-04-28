@@ -68,7 +68,8 @@ static inline bool is_type_keyword(Parser* p) {
         TOKEN_KEYWORD_STRING,
         TOKEN_KEYWORD_INT,
         TOKEN_KEYWORD_FLOAT,
-        TOKEN_KEYWORD_BOOLEAN
+        TOKEN_KEYWORD_BOOLEAN,
+        TOKEN_KEYWORD_NIL
     );
 }
 
@@ -129,6 +130,7 @@ static Node* parse_statement(Parser* p); // dispatcher
 static Node* parse_declaration(Parser* p);
 static Node* parse_assignment(Parser* p);
 static Node* parse_conditional(Parser* p);
+static Node* parse_block(Parser* p);
 
 // Expression Functions
 static Node* parse_expression(Parser* p); // dispatcher
@@ -256,6 +258,12 @@ static Node* parse_primary(Parser* p) {
         expect(p, TOKEN_RIGHT_PARENTHESES);
         return expr;
     }
+    if (check(p, TOKEN_LEFT_BRACE)) {
+        Node* block = parse_block(p);
+        expect(p, TOKEN_RIGHT_BRACE);
+        node_print(block, 0);
+        return block;
+    }
 
     Token t = peek(p);
     LOG_FATAL("expected expression, got %s at line %zu column %zu",
@@ -314,6 +322,19 @@ static Node* parse_assignment(Parser* p) {
     Node* value = parse_expression(p);
     expect(p, TOKEN_RIGHT_PARENTHESES);
     return Assign(p->yant_ctx, identifier.lexeme, value, set.line, set.column);
+}
+
+static Node* parse_block(Parser* p) {
+    // [TOKEN_LBRACE, ...., TOKEN_RBRACE]
+    Token lbrace = advance(p); // consumes Token::LeftBrace
+
+    Vector statements = vec_of(Node*);
+    while (!check(p, TOKEN_RIGHT_BRACE) && !is_eof(p)) {
+        Node* statement = parse_statement(p);
+        vec_push(&statements, &statement);
+    }
+
+    return Block(p->yant_ctx, statements, lbrace.line, lbrace.column);
 }
 
 Vector parse(Parser* p) {

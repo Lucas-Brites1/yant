@@ -19,6 +19,7 @@ typedef struct Node Node;
     extends(NODE_IF,                 "Node::If")            \
     extends(NODE_IDENTIFIER,         "Node::Identifier")    \
     extends(NODE_BINARY_OP,          "Node::BinaryOp")      \
+    extends(NODE_BLOCK,              "Node::Block")         \
     extends(NODE_CALL,               "Node::Call")          \
     extends(NODE_DECLARATION,        "Node::Declaration")   \
     extends(NODE_ASSIGNMENT,         "Node::Assignment")
@@ -77,6 +78,10 @@ struct Node {
         } if_expression;
 
         struct {
+            Vector statements;
+        } block;
+
+        struct {
             Node*  callee;
             Vector arguments;
         } call;
@@ -101,8 +106,10 @@ Node* Operation      (YantContext* ctx, TokenType op, Node* left, Node* right);
 Node* Declare        (YantContext* ctx, TokenType kind, StringSlice name, Node* value, usize line, usize col);
 Node* Assign         (YantContext* ctx, StringSlice name, Node* value, usize line, usize col);
 Node* If             (YantContext* ctx, Node* base_cond, Node* then_cond, Node* else_cond, usize line, usize col);
+Node* Block         (YantContext* ctx, Vector statements, usize line, usize col);
 Node* Call           (YantContext* ctx, Node* callee, Vector args, usize line, usize col);
 Node* Nil            (YantContext* ctx, usize line, usize col);
 Node* Eof            (YantContext* ctx, usize line, usize col);
 
 void node_print(Node* n, int depth);
+void node_free(Node* n);

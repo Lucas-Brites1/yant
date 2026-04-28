@@ -80,6 +80,10 @@ static Token scan_identifier(Source* s) {
     StringSlice lexeme = { .data = s->text + start_cursor, .length = length };
 
     TokenType type = identify_keyword(lexeme);
+    if (type == TOKEN_LITERAL_NIL) {
+        if (peek(s) == ':') type = TOKEN_KEYWORD_NIL;
+    }
+
     Token     tk   = make_token(type, lexeme, start_line, start_column);
 
     if (type == TOKEN_LITERAL_BOOLEAN) tk.literal.boolean_value = ss_eq_cstr(lexeme, "true");

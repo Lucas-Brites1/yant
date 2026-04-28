@@ -78,6 +78,12 @@ Node* If             (YantContext* ctx, Node* base_cond, Node* then_cond, Node* 
     return n;
 }
 
+Node* Block         (YantContext* ctx, Vector statements, usize line, usize col) {
+    Node* n = alloc_new_node(ctx->ast, NODE_BLOCK, line, col);
+    n->as.block.statements = statements;
+    return n;
+}
+
 Node* Call           (YantContext* ctx, Node* callee, Vector args, usize line, usize col) {
     Node* n = alloc_new_node(ctx->ast, NODE_CALL, line, col);
     n->as.call.callee = callee;
@@ -140,7 +146,42 @@ void node_print(Node* n, int depth) {
             node_print(n->as.if_expression.then_cond, depth + 1);
             node_print(n->as.if_expression.else_cond, depth + 1);
             break;
+        case NODE_BLOCK:
+            printf("%s::Begin\n", node_type_str(t));
+            vec_foreach(Node*, st, &n->as.block.statements) {
+                node_print(*st, 1);
+            }
+            printf("%s::End\n", node_type_str(t));
+            break;
         default:
             fprintf(stderr, "Unknown node type: %s\n", node_type_str(n->type));
+    }
+}
+
+void node_free(Node* n) {
+    if (!n) return;
+    switch (n->type) {
+        case NODE_BLOCK:
+            vec_foreach(Node*, child, &n->as.block.statements) {
+                node_free(*child);
+            }
+            vec_free(&n->as.block.statements);
+            break;
+        case NODE_BINARY_OP:
+            node_free(n->as.binary.left);
+            node_free(n->as.binary.right);
+            break;
+        case NODE_IF:
+            node_free(n->as.if_expression.base_cond);
+            node_free(n->as.if_expression.then_cond);
+            node_free(n->as.if_expression.else_cond);
+            break;
+        case NODE_DECLARATION:
+            node_free(n->as.declare.value);
+            break;
+        case NODE_ASSIGNMENT:
+            node_free(n->as.assign.value);
+            break;
+        default: break;
     }
 }

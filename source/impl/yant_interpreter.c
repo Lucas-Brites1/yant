@@ -2,17 +2,57 @@
 #include "../include/yant_value.h"
 #include "../include/yant_parser.h"
 
+static inline Map* current_scope(Interpreter* i) {
+    return &vec_at(Map, &i->scopes, i->scopes.len - 1);
+}
+
+static inline void enter_scope(Interpreter* i) {
+    Map scope = hmap_create(HMAP_INITIAL_CAP);
+    vec_push(&i->scopes, &scope);
+}
+
+static inline void exit_scope(Interpreter* i) {
+    LOG_ASSERT(i->scopes.len > 1, "cannot exit global scope");
+    Map* top = current_scope(i);
+    hmap_free(top);
+    i->scopes.len--;
+}
+
 static inline bool at_end(Interpreter* i) {
     return i->nodes->len == i->current;
+}
+
+static Map* find_scope_with(Interpreter* i, StringSlice name) {
+    for (usize idx = i->scopes.len - 1; idx >= 0; idx--) {
+        Map* scope = &vec_at(Map, &i->scopes, idx);
+        if (hmap_has(scope, name)) return scope;
+    }
+
+    return nil;
+}
+
+static ValueType expected_value_type(TokenType kind) {
+    switch (kind) {
+        case TOKEN_KEYWORD_INT:     return VALUE_INT;
+        case TOKEN_KEYWORD_FLOAT:   return VALUE_FLOAT;
+        case TOKEN_KEYWORD_STRING:  return VALUE_STRING;
+        case TOKEN_KEYWORD_BOOLEAN: return VALUE_BOOL;
+        case TOKEN_KEYWORD_NIL:     return VALUE_NIL;
+        default:
+            LOG_FATAL("invalid kind in declaration: %s", token_type_str(kind));
+            return VALUE_NIL;
+    }
 }
 
 Value evaluate(Interpreter* interpreter);
 Value dispatcher(Interpreter* i, Node* n);
 
 Value find_identifier     (Interpreter* i,  Node* n);
-Value evaluate_declaration(Interpreter* i, Node* n);
+Value evaluate_declaration(Interpreter* i,  Node* n);
 Value evaluate_assignment (Interpreter* i,  Node* n);
-Value evaluate_operation  (Interpreter* i,   Node* n);
+Value evaluate_operation  (Interpreter* i,  Node* n);
+Value evaluate_conditional(Interpreter* i,  Node* n);
+Value evaluate_block      (Interpreter* i,  Node* n);
 
 static inline Node* advance(Interpreter* i) {
     return vec_at(Node*, i->nodes, i->current++);
@@ -29,33 +69,39 @@ Value dispatcher(Interpreter* i, Node* n) {
         case NODE_DECLARATION:       return evaluate_declaration(i, n);
         case NODE_ASSIGNMENT:        return evaluate_assignment(i, n);
         case NODE_IDENTIFIER:        return find_identifier(i, n);
+        case NODE_IF:                return evaluate_conditional(i, n);
+        case NODE_BLOCK:             return evaluate_block(i, n);
         default:
             LOG_DEBUG("WIP");
             return NilValue();
     }
 }
 
-// 2 * 3
-// [TOKEN_LITERAL_INTEGER(2), TOKEN_STAR, TOKEN_LITERAL_INTEGER(3)]
-// * 2 3
-// BinaryOp::Star{left=2, right=3};
 Value evaluate(Interpreter* interpreter) {
     Node* current = advance(interpreter);
     return dispatcher(interpreter, current);
 }
 
 Interpreter interpreter_create(YantContext* yant_context, Vector* nodes) {
-    return (Interpreter) {
+    Interpreter i = {
         .yant_ctx = yant_context,
         .nodes    = nodes,
-        .environ  = hmap_create(HMAP_INITIAL_CAP),
+        .scopes   = vec_of(Map),
         .current  = 0
     };
+
+    Map global = hmap_create(HMAP_INITIAL_CAP);
+    vec_push(&i.scopes, &global);
+    return i;
 }
 
 void interpreter_free(Interpreter* i) {
     if (!i) return;
-    hmap_free(&i->environ);
+    vec_foreach(Map, scope, &i->scopes) {
+        hmap_free(scope);
+    }
+
+    vec_free(&i->scopes);
 }
 
 void interpret(Interpreter* interpreter) {
@@ -237,25 +283,36 @@ Value evaluate_operation(Interpreter* i, Node* n) {
 Value evaluate_declaration(Interpreter* i, Node* n) {
     StringSlice identifier = n->as.declare.name;
 
-    if(hmap_has(&i->environ, identifier)) {
+    if(hmap_has(current_scope(i), identifier)) {
         LOG_FATAL("variable already declared: " SS_FMT, SS_ARG(identifier));
     }
 
-    Value* stored = value_alloc(i->yant_ctx, dispatcher(i, n->as.declare.value));
-    hmap_insert(&i->environ, identifier, stored);
+    Value     computed = dispatcher(i, n->as.declare.value);
+    ValueType expected = expected_value_type(n->as.declare.kind);
+
+    if (computed.type != expected) {
+        LOG_FATAL(
+            "type mismatch in declaration of '" SS_FMT "': expected %s, got %s",
+            SS_ARG(identifier),
+            value_type_str(expected),
+            value_type_str(computed.type)
+        );
+    }
+
+    Value* stored = value_alloc(i->yant_ctx, computed);
+    hmap_insert(current_scope(i), identifier, stored);
 
     return NilValue();
 }
 
 Value evaluate_assignment(Interpreter* i,  Node* n) {
     StringSlice identifier = n->as.assign.name;
+    Value       new_value  = dispatcher(i, n->as.assign.value);
 
-    if (!hmap_has(&i->environ, identifier)) {
-        LOG_FATAL("undefined variable in assignment: " SS_FMT, SS_ARG(identifier));
-    }
+    Map* scope = find_scope_with(i, identifier);
+    if (!scope) LOG_FATAL("undefined variable in assignment: '" SS_FMT "'", SS_ARG(identifier));
 
-    Value  new_value  = dispatcher(i, n->as.assign.value);
-    Value* old_stored = hmap_get_as(Value, &i->environ, identifier);
+    Value* old_stored = hmap_get_as(Value, scope, identifier);
 
     if (old_stored->type != new_value.type) {
         LOG_FATAL(
@@ -266,24 +323,36 @@ Value evaluate_assignment(Interpreter* i,  Node* n) {
     }
 
     Value* new_stored = value_alloc(i->yant_ctx, new_value);
-    hmap_update(&i->environ, identifier, new_stored);
-
+    hmap_update(scope, identifier, new_stored);
     return NilValue();
 }
 
 Value evaluate_conditional(Interpreter* i, Node* n) {
-TODO();
+    // (conditional(boolean), then_branch<expression>, else_branch<expression>)
+    Value conditional_branch = dispatcher(i, n->as.if_expression.base_cond);
+
+    if (conditional_branch.type != VALUE_BOOL) LOG_FATAL("if condition must be boolean, got %s", value_type_str(conditional_branch.type));
+    if (conditional_branch.as_bool) return dispatcher(i, n->as.if_expression.then_cond);
+    return dispatcher(i, n->as.if_expression.else_cond);
+}
+
+Value evaluate_block(Interpreter* i, Node* n) {
+    enter_scope(i);
+    Vector statements = n->as.block.statements;
+
+    Value last = NilValue();
+    vec_foreach(Node*, node, &statements) {
+        last = dispatcher(i, *node);
+    }
+
+    exit_scope(i);
+    return last;
 }
 
 Value find_identifier(Interpreter* i, Node* n) {
     StringSlice identifier = n->as.identifier.name;
 
-    if (!hmap_has(&i->environ, identifier)) {
-        LOG_FATAL(
-            "undefined variable '" SS_FMT "': not declared in current scope",
-            SS_ARG(identifier)
-        );
-    }
-
-    return *hmap_get_as(Value, &i->environ, identifier);
+    Map* scope = find_scope_with(i, identifier);
+    if (!scope) LOG_FATAL("undefined variable '" SS_FMT "'", SS_ARG(identifier));
+    return *hmap_get_as(Value, scope, identifier);
 }

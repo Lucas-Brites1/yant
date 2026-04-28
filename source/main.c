@@ -21,30 +21,26 @@ int main(void) {
     logc_set_show_time(false);
 
     YantContext ctx = yant_context_init(Kib_(50), Kib_(50), Kib_(50), Kib_(50));
-    Source      src = source_load("./yant_files/impl_if.yn");
+    Source      src = source_load("./yant_files/block.yn");
 
     Vector   tokens = tokenize(&src);
-
 
     vec_foreach(Token, tk, &tokens) {
         LOG_DEBUG("%s", token_type_str(tk->type));
     }
 
-
     Parser   parser = parser_create(&ctx, &tokens);
     Vector   nodes  = parse(&parser);
+    Interpreter intr= interpreter_create(&ctx, &nodes);
+    interpret(&intr);
 
     vec_foreach(Node*, nd, &nodes) {
-        node_print(*nd, 0);
+        node_free(*nd);
     }
-
-    blob_print_stats(ctx.strings);
-    blob_print_stats(ctx.tokens);
-    blob_print_stats(ctx.ast);
-    blob_print_stats(ctx.runtime);
 
     vec_free(&tokens);
     vec_free(&nodes);
+    interpreter_free(&intr);
     source_free(&src);
     yant_context_free(&ctx);
     return 0;

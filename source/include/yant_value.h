@@ -29,8 +29,8 @@ static inline const char* value_type_str(ValueType t) {
     }
 }
 #undef EXTENDS_VALUE_AS_STRING
-
-typedef struct {
+typedef struct Value Value;
+struct Value {
     ValueType type;
     union {
       i64         as_int;
@@ -38,7 +38,7 @@ typedef struct {
       StringSlice as_string;
       bool        as_bool;
     };
-} Value;
+};
 
 void value_print(void* v);
 Value* value_alloc(YantContext* ctx, Value value);

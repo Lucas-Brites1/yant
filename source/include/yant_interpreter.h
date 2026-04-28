@@ -10,7 +10,7 @@
 typedef struct {
     YantContext* yant_ctx;
     Vector*      nodes;
-    Map          environ;
+    Vector       scopes; // Vector<Map*>
     usize        current;
 } Interpreter;
 

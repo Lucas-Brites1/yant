@@ -49,3 +49,9 @@ void* vec_get(Vector* vec, usize index) {
     assert(vec && vec->len > index);
     return vec->data + index * vec->element_size;
 }
+
+void vec_pop(Vector* vec, void** out) {
+    vec->len--;
+    vec->len--;
+    memcpy(out, (u8*)vec->data + vec->len * vec->element_size, vec->element_size);
+}

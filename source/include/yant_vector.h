@@ -21,6 +21,7 @@ void vec_push(Vector* vec, void* element);
 #define vec_at(T, vec, index) *((T*)vec_get(vec, index))
 #define vec_ref(T, vec, index) ((T*)vec_get(vec, index))
 void* vec_get(Vector* vec, usize index);
+void vec_pop(Vector* vec, void** out);
 
 #define vec_foreach(T, var, vec) \
     for (usize _i=0; _i<(vec)->len; _i++) \

@@ -2,7 +2,7 @@
 #include "./yant_types.h"
 
 static inline bool is_letter(char c) {
-    return (c >= 'a' && c < 'z') || (c >= 'A' && c <= 'Z');
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
 static inline bool is_digit(char c) {
