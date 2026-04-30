@@ -1,47 +1,53 @@
-# Exemplos
-func:hello({
-    printf("Hello {name}!")
-})(string:name("World")) returns void
+## ctx->strings está morto
 
-func:main({
-    loop(integer:i(0); i < 10; i += 1) {
-        printf(hello(i))
-    }
-}) returns void
+Estado atual: ctx->strings é arena alocada em yant_context_init mas
+nunca usada. Lexemes apontam diretamente pra Source.text.
 
-fn : fatorial({
-  // conditional | then | else
-  if(num in(0,1), num, num * fatorial(set:num(num-1)))
-})(integer:num) returns integer
+Decisões possíveis:
+- (A) Deletar ctx->strings. Strings dinâmicas vão pra ctx->runtime.
+- (B) Repurpose pra strings dinâmicas (renomear pra clareza).
+- (C) Implementar internalização real com dedup.
 
-fatorial(arg:num(5)) -> {
-  println("5! = <:num>")
-}
+Recomendação: A primeiro. C quando lifetime de Source.text virar limitação
+(REPL, imports) ou comparação de slices virar gargalo perfilado.
 
-fn : teste({
-  if(idade < 18, "jovem", 
-    if(idade >=18 and idade < 30, "jovem-adulto", 
-      if(idade >= 30 and idade < 60, "adulto", "idoso")
-    )
-  )
-})(integer:idade) returns string
+Não fazer agora — débito documentado. Implementar junto com primeiro caso
+real de string dinâmica (concat, format).
 
-// ou
 
-fn:teste({
-    cond(
-        idade < 18,                       "jovem",
-        idade >= 18 and idade < 30,       "jovem-adulto",
-        idade >= 30 and idade < 60,       "adulto",
-        "idoso"
-    )
-})(integer:idade) returns string
+## Named arguments (v0.2+)
 
-## Tipos
-  **Array**: array<integer>:arrnums([1,2,3,4,5]) // fixo em memoria
-  arrnums.push(10) // panic, array nao eh dinamico, eh constante
-  **Vector**: vector<integer>:vecnums([1,2,3]) // dinamico
-  vecnums.push(10) -> [1,2,3,10]
-  vector<integer>:evennums(
-    vecnums |> push(10) |> filter(n -> n % 2 == 0)
-  )
+Permitir:
+- soma(:x 10, :y 20)            // named
+- soma(10, 20)                   // positional (default v0.1)
+- soma(10, :y 20)                // misturado (positional first, then named)
+
+Requer:
+- Tag ArgKind no parser
+- Validação: positional antes de named
+- Validação: sem duplicatas
+- Resolução: matching de :name pra params
+
+Pré-requisitos:
+- Função funcionando com positional simples (v0.1)
+- Match implementado (v0.1)
+- Loop implementado (v0.1)
+
+## Performance — observações iniciais
+
+fib(30) recursivo ingênuo: ~3-4 segundos (~2.7M chamadas).
+fatorial(19): instantâneo (~19 chamadas).
+
+Gargalos prováveis:
+- enter_scope/exit_scope (calloc/free do hashmap por chamada)
+- value_alloc na arena runtime
+- vec_of/vec_free de arg_values
+
+Otimizações futuras (não fazer ainda):
+- Pool de scopes reusáveis
+- Bytecode VM (Crafting Interpreters parte 2)
+- Stack-based locals em vez de hashmap por função
+
+Decisão: aceitar performance atual pra v0.1. Yant é didática,
+não competidora de Lua/Python. Otimizar quando programar Yant
+"em escala" virar dor real.

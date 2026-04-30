@@ -1,6 +1,7 @@
 #pragma once
 #include "logc.h"
 #include "blobberman.h"
+#include "yant_ast.h"
 #include "yant_context.h"
 #include "yant_strings.h"
 #include "yant_types.h"
@@ -11,6 +12,7 @@
     extends(VALUE_STRING,"Value::String")  \
     extends(VALUE_NIL,   "Value::Nil")     \
     extends(VALUE_BOOL,  "Value::Boolean") \
+    extends(VALUE_FN,    "Value::Fn")      \
 
 #define EXTENDS_VALUE_ENUM(T, str) T,
 typedef enum {
@@ -37,6 +39,7 @@ struct Value {
       f64         as_float;
       StringSlice as_string;
       bool        as_bool;
+      Function*   as_fn;
     };
 };
 
@@ -74,5 +77,12 @@ static inline Value  BooleanValue(bool value) {
 static inline Value  NilValue(void) {
     return (Value) {
         .type = VALUE_NIL,
+    };
+}
+
+static inline Value FnValue(Function* fn) {
+    return (Value) {
+        .type  = VALUE_FN,
+        .as_fn = fn
     };
 }

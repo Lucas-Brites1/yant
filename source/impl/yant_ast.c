@@ -17,6 +17,13 @@ static inline Node* alloc_new_node(Blob* ast_blob, NodeType type, usize line, us
     return new_node;
 }
 
+static inline Function* alloc_new_function(Blob* ast_blob) {
+    LOG_ASSERT(ast_blob, "Failed due to invalid pointer as ast blob");
+    Function* fn = (Function*)blob_reserve(ast_blob, sizeof(Function));
+    LOG_ASSERT(fn, "Failed trying to allocate new function");
+    return fn;
+}
+
 Node* LiteralInteger (YantContext* ctx, i64 value, usize line, usize col) {
     Node* n = alloc_new_node(ctx->ast, NODE_LITERAL_INTEGER, line, col);
     n->as.int_literal.value = value;
@@ -96,6 +103,20 @@ Node* Nil            (YantContext* ctx, usize line, usize col) {
     return n;
 }
 
+Node* FnDeclare      (YantContext* ctx, StringSlice name, Vector params, Node* body, TokenType return_type, usize line, usize col) {
+    Node* n = alloc_new_node(ctx->ast, NODE_FNDECLARE, line, col);
+    Function* fn = alloc_new_function(ctx->ast);
+
+    fn->name   = name;
+    fn->params = params;
+    fn->body   = body;
+    fn->return_type = return_type;
+
+    n->as.function = fn;
+    return n;
+}
+
+
 void node_print(Node* n, int depth) {
     for (int i = 0; i < depth * 2; i++) putchar(' ');
     NodeType t = n->type;
@@ -136,6 +157,20 @@ void node_print(Node* n, int depth) {
             printf("%s(" SS_FMT ")\n", node_type_str(t), SS_ARG(n->as.assign.name));
             node_print(n->as.assign.value, depth + 1);
             break;
+        case NODE_FNDECLARE:
+            printf("%s:" SS_FMT"(", node_type_str(t), SS_ARG(n->as.function->name));
+            Vector params = n->as.function->params;
+            for (usize i = 0; i < params.len; i++) {
+                Param* param = vec_ref(Param, &params, i);
+                if (i == params.len - 1) {
+                    printf("%s:" SS_FMT, token_type_str(param->param_type), SS_ARG(param->param_name));
+                    break;
+                }
+                printf("%s:" SS_FMT ", ", token_type_str(param->param_type), SS_ARG(param->param_name));
+            }
+            printf("):%s ", token_type_str(n->as.function->return_type));
+            node_print(n->as.function->body, 0);
+            break;
         case NODE_CALL:
             printf("%s\n", node_type_str(t));
             node_print(n->as.call.callee, depth + 1);
@@ -161,11 +196,24 @@ void node_print(Node* n, int depth) {
 void node_free(Node* n) {
     if (!n) return;
     switch (n->type) {
+        case NODE_IDENTIFIER: break;
         case NODE_BLOCK:
             vec_foreach(Node*, child, &n->as.block.statements) {
                 node_free(*child);
             }
             vec_free(&n->as.block.statements);
+            break;
+        case NODE_FNDECLARE:
+            vec_free(&n->as.function->params);
+            node_free(n->as.function->body);
+            break;
+        case NODE_CALL:
+            node_free(n->as.call.callee);
+            Vector args = n->as.call.arguments;
+            vec_foreach(Node*, arg, &args) {
+                node_free(*arg);
+            }
+            vec_free(&args);
             break;
         case NODE_BINARY_OP:
             node_free(n->as.binary.left);

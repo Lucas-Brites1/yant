@@ -38,6 +38,24 @@ int main(void) {
         node_free(*nd);
     }
 
+    /*
+    LOG_DEBUG("Strings blob:");
+    blob_print_stats(ctx.strings);
+    LOG_LINE;
+
+    LOG_DEBUG("Tokens blob:");
+    blob_print_stats(ctx.tokens);
+    LOG_LINE;
+
+    LOG_DEBUG("Ast blob:");
+    blob_print_stats(ctx.ast);
+    LOG_LINE;
+
+    LOG_DEBUG("Runtime blob:");
+    blob_print_stats(ctx.runtime);
+    LOG_LINE;
+    */
+
     vec_free(&tokens);
     vec_free(&nodes);
     interpreter_free(&intr);

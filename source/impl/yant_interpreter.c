@@ -33,11 +33,11 @@ static Map* find_scope_with(Interpreter* i, StringSlice name) {
 
 static ValueType expected_value_type(TokenType kind) {
     switch (kind) {
-        case TOKEN_KEYWORD_INT:     return VALUE_INT;
-        case TOKEN_KEYWORD_FLOAT:   return VALUE_FLOAT;
-        case TOKEN_KEYWORD_STRING:  return VALUE_STRING;
-        case TOKEN_KEYWORD_BOOLEAN: return VALUE_BOOL;
-        case TOKEN_KEYWORD_NIL:     return VALUE_NIL;
+        case TOKEN_TYPE_INT:     return VALUE_INT;
+        case TOKEN_TYPE_FLOAT:   return VALUE_FLOAT;
+        case TOKEN_TYPE_STRING:  return VALUE_STRING;
+        case TOKEN_TYPE_BOOLEAN: return VALUE_BOOL;
+        case TOKEN_TYPE_NIL:     return VALUE_NIL;
         default:
             LOG_FATAL("invalid kind in declaration: %s", token_type_str(kind));
             return VALUE_NIL;
@@ -53,6 +53,8 @@ Value evaluate_assignment (Interpreter* i,  Node* n);
 Value evaluate_operation  (Interpreter* i,  Node* n);
 Value evaluate_conditional(Interpreter* i,  Node* n);
 Value evaluate_block      (Interpreter* i,  Node* n);
+Value evaluate_function_declaration(Interpreter* i, Node* n);
+Value evaluate_function_call(Interpreter* i,  Node* n);
 
 static inline Node* advance(Interpreter* i) {
     return vec_at(Node*, i->nodes, i->current++);
@@ -71,6 +73,8 @@ Value dispatcher(Interpreter* i, Node* n) {
         case NODE_IDENTIFIER:        return find_identifier(i, n);
         case NODE_IF:                return evaluate_conditional(i, n);
         case NODE_BLOCK:             return evaluate_block(i, n);
+        case NODE_FNDECLARE:         return evaluate_function_declaration(i, n);
+        case NODE_CALL:              return evaluate_function_call(i, n);
         default:
             LOG_DEBUG("WIP");
             return NilValue();
@@ -125,6 +129,9 @@ void interpret(Interpreter* interpreter) {
                 continue;
             case VALUE_BOOL:
                 LOG_DEBUG("%s(%s)", value_type_str(v.type), v.as_bool ? "true" : "false");
+                continue;
+            case VALUE_FN:
+                LOG_DEBUG("%s:" SS_FMT "(...):%s {}", value_type_str(v.type), SS_ARG(v.as_fn->name), token_type_str(v.as_fn->return_type));
                 continue;
             default: TODO("%s not implemented yet", value_type_str(v.type));
         }
@@ -280,6 +287,14 @@ Value evaluate_operation(Interpreter* i, Node* n) {
     return NilValue();
 }
 
+Value find_identifier(Interpreter* i, Node* n) {
+    StringSlice identifier = n->as.identifier.name;
+
+    Map* scope = find_scope_with(i, identifier);
+    if (!scope) LOG_FATAL("undefined variable '" SS_FMT "'", SS_ARG(identifier));
+    return *hmap_get_as(Value, scope, identifier);
+}
+
 Value evaluate_declaration(Interpreter* i, Node* n) {
     StringSlice identifier = n->as.declare.name;
 
@@ -302,7 +317,7 @@ Value evaluate_declaration(Interpreter* i, Node* n) {
     Value* stored = value_alloc(i->yant_ctx, computed);
     hmap_insert(current_scope(i), identifier, stored);
 
-    return NilValue();
+    return computed;
 }
 
 Value evaluate_assignment(Interpreter* i,  Node* n) {
@@ -324,7 +339,7 @@ Value evaluate_assignment(Interpreter* i,  Node* n) {
 
     Value* new_stored = value_alloc(i->yant_ctx, new_value);
     hmap_update(scope, identifier, new_stored);
-    return NilValue();
+    return new_value;
 }
 
 Value evaluate_conditional(Interpreter* i, Node* n) {
@@ -349,10 +364,80 @@ Value evaluate_block(Interpreter* i, Node* n) {
     return last;
 }
 
-Value find_identifier(Interpreter* i, Node* n) {
-    StringSlice identifier = n->as.identifier.name;
+Value evaluate_function_declaration(Interpreter* i, Node* n) {
+    Function* fn = n->as.function;
+    Map*   scope = current_scope(i);
 
-    Map* scope = find_scope_with(i, identifier);
-    if (!scope) LOG_FATAL("undefined variable '" SS_FMT "'", SS_ARG(identifier));
-    return *hmap_get_as(Value, scope, identifier);
+    if (hmap_has(scope, fn->name)) {
+        LOG_FATAL("function '" SS_FMT "' already declared in current scope", SS_ARG(fn->name));
+    }
+
+    Value fn_value = FnValue(fn);
+    Value* stored  = value_alloc(i->yant_ctx, fn_value);
+    hmap_insert(scope, fn->name, stored);
+
+    return fn_value;
+}
+
+Value evaluate_function_call(Interpreter* i,  Node* n) {
+    Value fn_val = dispatcher(i, n->as.call.callee);
+
+    if (fn_val.type != VALUE_FN) {
+        LOG_FATAL("not callable: %s", value_type_str(fn_val.type));
+    }
+
+    // pegar o nome do parametro associar com o valor recebido na chamada colocar criar um novo scope e avaliar o bloco da funcao que vou procurar nos scopes tb...
+    Function* fn  = fn_val.as_fn;
+    Vector params = fn->params;
+    Vector args   = n->as.call.arguments;
+
+    if (params.len != args.len) {
+        LOG_FATAL("'" SS_FMT "' expects %zu args, got %zu", SS_ARG(fn->name), params.len, args.len);
+    }
+
+    Vector arg_values = vec_of(Value);
+    vec_foreach(Node*, arg_node, &args) {
+        Value arg_val = dispatcher(i, *arg_node);
+        vec_push(&arg_values, &arg_val);
+    }
+
+    for (usize idx = 0; idx < params.len; idx++) {
+        Param* p = vec_ref(Param, &params, idx);
+        Value* v = vec_ref(Value, &arg_values, idx);
+        ValueType expected = expected_value_type(p->param_type);
+        if (v->type != expected) {
+            LOG_FATAL(
+                "arg %zu of '" SS_FMT "': expected %s, got %s",
+                idx, SS_ARG(fn->name),
+                value_type_str(expected), value_type_str(v->type)
+            );
+        }
+    }
+
+
+    enter_scope(i);
+    for (usize idx = 0; idx < params.len; idx++) {
+        Param* p = vec_ref(Param, &params, idx);
+        Value* v = vec_ref(Value, &arg_values, idx);
+        Value* stored = value_alloc(i->yant_ctx, *v);
+        hmap_insert(current_scope(i), p->param_name, stored);
+    }
+
+    Value callee_result = dispatcher(i, fn->body);
+    exit_scope(i);
+
+    vec_free(&arg_values);
+
+    ValueType expected_return = expected_value_type(fn->return_type);
+    if (callee_result.type != expected_return) {
+            LOG_FATAL(
+                "'" SS_FMT "' return: expected %s, got %s",
+                SS_ARG(fn->name),
+                value_type_str(expected_return),
+                value_type_str(callee_result.type)
+            );
+    }
+
+
+    return callee_result;
 }

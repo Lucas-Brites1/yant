@@ -10,15 +10,17 @@
 // | 1: Stringfied Label
 // | 2: Identifiers Matchers
 #define TOKENS_TABLE(extends) \
-    extends(TOKEN_KEYWORD_NIL, "Keyword::Nil")         \
-    extends(TOKEN_KEYWORD_INT, "Keyword::Integer")     \
-    extends(TOKEN_KEYWORD_FLOAT, "Keyword::Float")     \
-    extends(TOKEN_KEYWORD_STRING, "Keyword::String")   \
-    extends(TOKEN_KEYWORD_BOOLEAN, "Keyword::Boolean") \
-    extends(TOKEN_KEYWORD_SET, "Keyword::Set")         \
-    extends(TOKEN_KEYWORD_FN, "Keyword::Function")     \
-    extends(TOKEN_KEYWORD_IF, "Keyword::If-Statement") \
-    extends(TOKEN_KEYWORD_COND,"Keyword::Conditionals")\
+    extends(TOKEN_TYPE_NIL,      "Type::Nil")     \
+    extends(TOKEN_TYPE_INT,      "Type::Integer") \
+    extends(TOKEN_TYPE_FLOAT,    "Type::Float")   \
+    extends(TOKEN_TYPE_STRING,   "Type::String")  \
+    extends(TOKEN_TYPE_BOOLEAN,  "Type::Boolean") \
+    extends(TOKEN_TYPE_FUNCTION, "Type::Function")\
+    \
+    extends(TOKEN_KEYWORD_SET,      "Keyword::Set")         \
+    extends(TOKEN_KEYWORD_FN,       "Keyword::FunctionDeclare")     \
+    extends(TOKEN_KEYWORD_IF,       "Keyword::If-Statement") \
+    extends(TOKEN_KEYWORD_COND,     "Keyword::Conditionals")\
     \
     extends(TOKEN_COLON, "Syntax::Colon")                        \
     extends(TOKEN_RIGHT_PARENTHESES, "Syntax::RightParentheses") \

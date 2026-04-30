@@ -51,20 +51,37 @@ static inline void skip_whitespaces(Source* s) {
 }
 
 static TokenType identify_keyword(StringSlice lexeme) {
-    if (ss_eq_cstr(lexeme, "string"))  return TOKEN_KEYWORD_STRING;
-    if (ss_eq_cstr(lexeme, "integer")) return TOKEN_KEYWORD_INT;
-    if (ss_eq_cstr(lexeme, "float"))   return TOKEN_KEYWORD_FLOAT;
-    if (ss_eq_cstr(lexeme, "boolean")) return TOKEN_KEYWORD_BOOLEAN;
     if (ss_eq_cstr(lexeme, "set"))     return TOKEN_KEYWORD_SET;
     if (ss_eq_cstr(lexeme, "fn"))      return TOKEN_KEYWORD_FN;
     if (ss_eq_cstr(lexeme, "if"))      return TOKEN_KEYWORD_IF;
     if (ss_eq_cstr(lexeme, "cond"))    return TOKEN_KEYWORD_COND;
-    if (ss_eq_cstr(lexeme, "and"))     return TOKEN_AND;
-    if (ss_eq_cstr(lexeme, "or"))      return TOKEN_OR;
-    if (ss_eq_cstr(lexeme, "nil"))     return TOKEN_LITERAL_NIL;
-    if (ss_eq_cstr(lexeme, "true") || ss_eq_cstr(lexeme, "false"))    return TOKEN_LITERAL_BOOLEAN;
 
     return TOKEN_IDENTIFIER;
+}
+
+static TokenType identify_conditionals(StringSlice lexeme) {
+    if (ss_eq_cstr(lexeme, "and"))     return TOKEN_AND;
+    if (ss_eq_cstr(lexeme, "or"))      return TOKEN_OR;
+    return identify_keyword(lexeme);
+}
+
+static TokenType identify_literals(StringSlice lexeme) {
+    if (ss_eq_cstr(lexeme, "nil"))     return TOKEN_LITERAL_NIL;
+    if (ss_eq_cstr(lexeme, "true") || ss_eq_cstr(lexeme, "false"))    return TOKEN_LITERAL_BOOLEAN;
+    return identify_conditionals(lexeme);
+}
+
+static TokenType identify_type(StringSlice lexeme) {
+    if (ss_eq_cstr(lexeme, "string"))   return TOKEN_TYPE_STRING;
+    if (ss_eq_cstr(lexeme, "integer"))  return TOKEN_TYPE_INT;
+    if (ss_eq_cstr(lexeme, "float"))    return TOKEN_TYPE_FLOAT;
+    if (ss_eq_cstr(lexeme, "boolean"))  return TOKEN_TYPE_BOOLEAN;
+    if (ss_eq_cstr(lexeme, "function")) return TOKEN_TYPE_FUNCTION;
+    return identify_literals(lexeme);
+}
+
+static TokenType identify(StringSlice lexeme) {
+    return identify_type(lexeme);
 }
 
 static Token scan_identifier(Source* s) {
@@ -79,9 +96,9 @@ static Token scan_identifier(Source* s) {
     usize length = s->cursor - start_cursor;
     StringSlice lexeme = { .data = s->text + start_cursor, .length = length };
 
-    TokenType type = identify_keyword(lexeme);
+    TokenType type = identify(lexeme);
     if (type == TOKEN_LITERAL_NIL) {
-        if (peek(s) == ':') type = TOKEN_KEYWORD_NIL;
+        if (peek(s) == ':') type = TOKEN_TYPE_NIL;
     }
 
     Token     tk   = make_token(type, lexeme, start_line, start_column);

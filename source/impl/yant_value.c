@@ -17,6 +17,7 @@ void value_print(void* v) {
         case VALUE_INT:    printf("%s(%ld)",       valtype_str, val->as_int);                    break;
         case VALUE_BOOL:   printf("%s(%s)",       valtype_str, val->as_bool?"true":"false");     break;
         case VALUE_NIL:    printf("%s",           valtype_str);                                  break;
+        case VALUE_FN:     printf(SS_FMT "(...):%s", SS_ARG(val->as_fn->name), token_type_str(val->as_fn->return_type)); break;
         default: TODO("Otto says: '%s' not implemented yet..", valtype_str);
     }
 }

@@ -1,84 +1,9 @@
-// === TESTE COMPLETO PASSO 7 ===
+fn:fib_helper(integer:n, integer:a, integer:b):integer {
+    if (n == 0, a, fib_helper(n - 1, b, a + b))
+}
 
-// (1) declarações globais — tipos primitivos
-integer:base(100)
-integer:mult(2)
-string:nome("yant")
-boolean:ativo(true)
+fn:fib(integer:n):integer {
+    fib_helper(n, 0, 1)
+}
 
-// (2) declaração usando expressão de globais
-integer:soma(base + mult)
-
-// (3) bloco com declaração local + uso de global (lookup top-down)
-integer:r1({
-    integer:local1(10)
-    base + local1
-})
-
-// (4) shadowing — variável interna esconde global
-integer:r2({
-    integer:base(999)
-    base
-})
-
-// (5) aninhamento de 3 níveis
-integer:r3({
-    integer:a(1)
-    integer:nested({
-        integer:b(2)
-        integer:deep({
-            integer:c(3)
-            a + b + c
-        })
-        deep + b
-    })
-    nested + a
-})
-
-// (6) assignment cross-scope (modifica global de dentro de bloco)
-integer:counter(0)
-integer:r4({
-    set:counter(counter + 5)
-    set:counter(counter + 5)
-    counter
-})
-
-// (7) bloco vazio retorna nil
-nil:vazio({})
-
-// (8) bloco como branch de if + if dentro de bloco
-integer:r5({
-    integer:x(50)
-    if(x > 25, {
-        integer:bonus(100)
-        x + bonus
-    }, {
-        integer:penalty(10)
-        x - penalty
-    })
-})
-
-// (9) bloco que termina com statement (assignment) — retorna nil
-nil:r6({
-    integer:tmp(99)
-    set:counter(tmp)
-})
-
-// (10) operações compostas usando resultados de blocos
-integer:final(r1 + r3 + r4 + r5)
-
-// imprime tudo
-base
-mult
-nome
-ativo
-soma
-r1
-r2
-r3
-r4
-vazio
-r5
-r6
-counter
-final
+fib(150)

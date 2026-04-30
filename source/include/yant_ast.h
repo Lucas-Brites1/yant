@@ -20,6 +20,7 @@ typedef struct Node Node;
     extends(NODE_IDENTIFIER,         "Node::Identifier")    \
     extends(NODE_BINARY_OP,          "Node::BinaryOp")      \
     extends(NODE_BLOCK,              "Node::Block")         \
+    extends(NODE_FNDECLARE,          "Node::FunctionDecl")  \
     extends(NODE_CALL,               "Node::Call")          \
     extends(NODE_DECLARATION,        "Node::Declaration")   \
     extends(NODE_ASSIGNMENT,         "Node::Assignment")
@@ -41,6 +42,19 @@ static inline const char* node_type_str(NodeType type) {
     }
 }
 #undef X_AS_STRING
+
+typedef struct {
+    StringSlice param_name;
+    TokenType   param_type;
+} Param;
+
+
+typedef struct {
+    Vector      params; // vec_of(Param)
+    StringSlice name;
+    Node*       body;
+    TokenType   return_type;
+} Function;
 
 struct Node {
     NodeType type;
@@ -94,6 +108,8 @@ struct Node {
             TokenType kind;
             Vector    typed_arguments;
         } generic_type;
+
+        Function* function;
     } as;
 };
 
@@ -106,7 +122,8 @@ Node* Operation      (YantContext* ctx, TokenType op, Node* left, Node* right);
 Node* Declare        (YantContext* ctx, TokenType kind, StringSlice name, Node* value, usize line, usize col);
 Node* Assign         (YantContext* ctx, StringSlice name, Node* value, usize line, usize col);
 Node* If             (YantContext* ctx, Node* base_cond, Node* then_cond, Node* else_cond, usize line, usize col);
-Node* Block         (YantContext* ctx, Vector statements, usize line, usize col);
+Node* Block          (YantContext* ctx, Vector statements, usize line, usize col);
+Node* FnDeclare      (YantContext* ctx, StringSlice name, Vector params, Node* body, TokenType return_type, usize line, usize col);
 Node* Call           (YantContext* ctx, Node* callee, Vector args, usize line, usize col);
 Node* Nil            (YantContext* ctx, usize line, usize col);
 Node* Eof            (YantContext* ctx, usize line, usize col);
