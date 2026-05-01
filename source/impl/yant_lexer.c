@@ -51,37 +51,32 @@ static inline void skip_whitespaces(Source* s) {
 }
 
 static TokenType identify_keyword(StringSlice lexeme) {
-    if (ss_eq_cstr(lexeme, "set"))     return TOKEN_KEYWORD_SET;
-    if (ss_eq_cstr(lexeme, "fn"))      return TOKEN_KEYWORD_FN;
-    if (ss_eq_cstr(lexeme, "if"))      return TOKEN_KEYWORD_IF;
-    if (ss_eq_cstr(lexeme, "cond"))    return TOKEN_KEYWORD_COND;
-
-    return TOKEN_IDENTIFIER;
-}
-
-static TokenType identify_conditionals(StringSlice lexeme) {
-    if (ss_eq_cstr(lexeme, "and"))     return TOKEN_AND;
-    if (ss_eq_cstr(lexeme, "or"))      return TOKEN_OR;
-    return identify_keyword(lexeme);
-}
-
-static TokenType identify_literals(StringSlice lexeme) {
-    if (ss_eq_cstr(lexeme, "nil"))     return TOKEN_LITERAL_NIL;
-    if (ss_eq_cstr(lexeme, "true") || ss_eq_cstr(lexeme, "false"))    return TOKEN_LITERAL_BOOLEAN;
-    return identify_conditionals(lexeme);
-}
-
-static TokenType identify_type(StringSlice lexeme) {
+    // Types
     if (ss_eq_cstr(lexeme, "string"))   return TOKEN_TYPE_STRING;
     if (ss_eq_cstr(lexeme, "integer"))  return TOKEN_TYPE_INT;
     if (ss_eq_cstr(lexeme, "float"))    return TOKEN_TYPE_FLOAT;
     if (ss_eq_cstr(lexeme, "boolean"))  return TOKEN_TYPE_BOOLEAN;
     if (ss_eq_cstr(lexeme, "function")) return TOKEN_TYPE_FUNCTION;
-    return identify_literals(lexeme);
-}
 
-static TokenType identify(StringSlice lexeme) {
-    return identify_type(lexeme);
+    // Special cases
+    if (ss_eq_cstr(lexeme, "nil"))      return TOKEN_NIL;
+
+    // Literals
+    if (ss_eq_cstr(lexeme, "true") || ss_eq_cstr(lexeme, "false"))
+        return TOKEN_LITERAL_BOOLEAN;
+
+    // Logical operators
+    if (ss_eq_cstr(lexeme, "and"))      return TOKEN_AND;
+    if (ss_eq_cstr(lexeme, "or"))       return TOKEN_OR;
+
+    // Declaration / flow control
+    if (ss_eq_cstr(lexeme, "set"))      return TOKEN_KEYWORD_SET;
+    if (ss_eq_cstr(lexeme, "fn"))       return TOKEN_KEYWORD_FN;
+    if (ss_eq_cstr(lexeme, "if"))       return TOKEN_KEYWORD_IF;
+    if (ss_eq_cstr(lexeme, "cond"))     return TOKEN_KEYWORD_COND;
+    if (ss_eq_cstr(lexeme, "match"))    return TOKEN_KEYWORD_MATCH;
+
+    return TOKEN_IDENTIFIER;
 }
 
 static Token scan_identifier(Source* s) {
@@ -96,11 +91,11 @@ static Token scan_identifier(Source* s) {
     usize length = s->cursor - start_cursor;
     StringSlice lexeme = { .data = s->text + start_cursor, .length = length };
 
-    TokenType type = identify(lexeme);
-    if (type == TOKEN_LITERAL_NIL) {
-        if (peek(s) == ':') type = TOKEN_TYPE_NIL;
+    if (lexeme.length == 1 && lexeme.data[0] == '_') {
+        return make_token(TOKEN_UNDERSCORE, SS("_"), start_line, start_column);
     }
 
+    TokenType type = identify_keyword(lexeme);
     Token     tk   = make_token(type, lexeme, start_line, start_column);
 
     if (type == TOKEN_LITERAL_BOOLEAN) tk.literal.boolean_value = ss_eq_cstr(lexeme, "true");
@@ -180,7 +175,13 @@ static Token scan_punctuation(Source* s) {
         case ']': return make_token(TOKEN_RIGHT_BRACKET,     SS("]"),  start_line, start_column);
         // operators puncts
         case '+': return make_token(TOKEN_PLUS,              SS("+"),  start_line, start_column);
-        case '-': return make_token(TOKEN_MINUS,             SS("-"),  start_line, start_column);
+        case '-': {
+            if (peek(s) == '>') {
+                advance(s);
+                return make_token(TOKEN_ARROW, SS("->"), start_line, start_column);
+            }
+            return make_token(TOKEN_MINUS, SS("-"), start_line, start_column);
+        }
         case '*': return make_token(TOKEN_STAR,              SS("*"),  start_line, start_column);
         case '/': return make_token(TOKEN_SLASH,             SS("/"),  start_line, start_column);
         case '=': {

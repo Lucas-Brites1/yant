@@ -24,6 +24,13 @@ static inline Function* alloc_new_function(Blob* ast_blob) {
     return fn;
 }
 
+static inline Match*  alloc_new_match(Blob *ast_blob) {
+    LOG_ASSERT(ast_blob, "Failed due to invalid pointer as ast blob");
+    Match* match = (Match*)blob_reserve(ast_blob, sizeof(Match));
+    LOG_ASSERT(match, "Failed trying to allocate new match");
+    return match;
+}
+
 Node* LiteralInteger (YantContext* ctx, i64 value, usize line, usize col) {
     Node* n = alloc_new_node(ctx->ast, NODE_LITERAL_INTEGER, line, col);
     n->as.int_literal.value = value;
@@ -116,6 +123,16 @@ Node* FnDeclare      (YantContext* ctx, StringSlice name, Vector params, Node* b
     return n;
 }
 
+Node* Matcher          (YantContext* ctx, Node* subject, Vector arms, TokenType match_return_type, usize line, usize col) {
+    Node* n = alloc_new_node(ctx->ast, NODE_MATCH, line, col);
+    Match* match = alloc_new_match(ctx->ast);
+    match->arms = arms;
+    match->subject = subject;
+    match->return_type = match_return_type;
+    n->as.match = match;
+    return n;
+}
+
 
 void node_print(Node* n, int depth) {
     for (int i = 0; i < depth * 2; i++) putchar(' ');
@@ -188,8 +205,26 @@ void node_print(Node* n, int depth) {
             }
             printf("%s::End\n", node_type_str(t));
             break;
+        case NODE_MATCH: {
+                Match* m = n->as.match;
+                printf("%*sNode::Match\n", depth*2, "");
+                printf("%*s  subject:\n", depth*2, "");
+                node_print(m->subject, depth + 2);
+                printf("%*s  arms (%zu):\n", depth*2, "", m->arms.len);
+                vec_foreach(MatchArm, arm, &m->arms) {
+                    if (arm->is_wildcard) {
+                        printf("%*s    [wildcard] ->\n", depth*2, "");
+                    } else {
+                        printf("%*s    [%s]\n", depth*2, "", token_type_str(arm->binop));
+                        node_print(arm->pattern, depth + 3);
+                        printf("%*s    ->\n", depth*2, "");
+                    }
+                    node_print(arm->arm_result, depth + 3);
+                }
+                break;
+            }
         default:
-            fprintf(stderr, "Unknown node type: %s\n", node_type_str(n->type));
+            TODO("Unknown node type: %s\n", node_type_str(n->type));
     }
 }
 
@@ -206,6 +241,17 @@ void node_free(Node* n) {
         case NODE_FNDECLARE:
             vec_free(&n->as.function->params);
             node_free(n->as.function->body);
+            break;
+        case NODE_MATCH:
+            Match* m    = n->as.match;
+            Vector arms = m->arms;
+            vec_foreach(MatchArm, arm, &arms) {
+                if (!arm->is_wildcard) {
+                    node_free(arm->pattern);
+                }
+                node_free(arm->arm_result);
+            }
+            vec_free(&arms);
             break;
         case NODE_CALL:
             node_free(n->as.call.callee);

@@ -1,9 +1,39 @@
-fn:fib_helper(integer:n, integer:a, integer:b):integer {
-    if (n == 0, a, fib_helper(n - 1, b, a + b))
+// Testing match with comparisons and wildcard
+integer:age(21)
+match(age):string {
+    == 23 -> "twenty-three",
+    <  23 -> "under twenty-three",
+    _     -> "over twenty-three"
 }
 
-fn:fib(integer:n):integer {
-    fib_helper(n, 0, 1)
+set:age(50)
+match(age):string {
+    == 23 -> "twenty-three",
+    <  23 -> "under twenty-three",
+    _     -> "over twenty-three"
 }
 
-fib(150)
+// Testing match returning integer
+integer:n(7)
+integer:doubled(match(n):integer {
+    == 0  -> 0,
+    <  10 -> n * 2,
+    _     -> n
+})
+
+// Testing match inside function
+fn:classify(integer:x):string {
+    match(x):string {
+        <  0  -> "negative",
+        == 0  -> "zero",
+        <= 9  -> "small",
+        <= 99 -> "medium",
+        _     -> "large"
+    }
+}
+
+classify(0 - 5)
+classify(0)
+classify(7)
+classify(42)
+classify(1000)

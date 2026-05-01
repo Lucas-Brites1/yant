@@ -15,6 +15,7 @@ static Node* parse_conditional(Parser* p);
 static Node* parse_block(Parser* p);
 static Node* parse_function_declaration(Parser* p);
 static Node* parse_call(Parser* p, Node* identifier);
+static Node* parse_match(Parser* p);
 
 // Expression Functions
 static Node* parse_expression(Parser* p); // dispatcher
@@ -71,6 +72,15 @@ static inline Param create_param(StringSlice pname, TokenType ptype) {
     };
 }
 
+static inline MatchArm create_match_arm(Node* pattern, Node* result, TokenType binop, bool is_wildcard) {
+    return (MatchArm) {
+        .binop = binop,
+        .pattern = pattern,
+        .arm_result = result,
+        .is_wildcard = is_wildcard
+    };
+}
+
 static inline Token expect(Parser* p, TokenType expected) {
     if (!check(p, expected)) {
         Token t = peek(p);
@@ -103,7 +113,7 @@ static inline bool is_type(Parser* p) {
         TOKEN_TYPE_FLOAT,
         TOKEN_TYPE_BOOLEAN,
         TOKEN_TYPE_FUNCTION,
-        TOKEN_TYPE_NIL
+        TOKEN_NIL
     );
 }
 
@@ -112,7 +122,8 @@ static inline bool is_statement_keyword(Parser* p) {
     return TYPE_IN(peek(p).type,
         TOKEN_KEYWORD_SET,
         TOKEN_KEYWORD_FN,
-        TOKEN_KEYWORD_IF
+        TOKEN_KEYWORD_IF,
+        TOKEN_KEYWORD_MATCH
         //TOKEN_KEYWORD_LOOP
     );
 }
@@ -294,7 +305,7 @@ static Node* parse_primary(Parser* p) {
 
         return ident;
     }
-    if (check(p, TOKEN_LITERAL_NIL)) {
+    if (check(p, TOKEN_NIL)) {
         Token tk_nil = advance(p);
         return Nil(p->yant_ctx, tk_nil.line, tk_nil.column);
     }
@@ -325,8 +336,11 @@ static Node* parse_primary(Parser* p) {
     }
     if (check(p, TOKEN_LEFT_BRACE)) {
         Node* block = parse_block(p);
-        node_print(block, 0);
         return block;
+    }
+    if (check(p, TOKEN_KEYWORD_MATCH)) {
+        Node* match = parse_match(p);
+        return match;
     }
 
     Token t = peek(p);
@@ -358,9 +372,10 @@ static Node* parse_conditional(Parser* p) {
 static Node* parse_statement(Parser* p) {
     if (is_type(p)) return parse_declaration(p);
     if (is_statement_keyword(p)) {
-        if (is_conditional_keyword(p))   return parse_conditional(p);
-        if (check(p, TOKEN_KEYWORD_SET)) return parse_assignment(p);
-        if (check(p, TOKEN_KEYWORD_FN))  return parse_function_declaration(p);
+        if (is_conditional_keyword(p))     return parse_conditional(p);
+        if (check(p, TOKEN_KEYWORD_SET))   return parse_assignment(p);
+        if (check(p, TOKEN_KEYWORD_FN))    return parse_function_declaration(p);
+        if (check(p, TOKEN_KEYWORD_MATCH)) return parse_match(p);
 
         Token tk = peek(p);
         TODO("implement %s", token_type_str(tk.type));
@@ -446,6 +461,78 @@ static Node* parse_function_declaration(Parser* p) {
 static Node* parse_call(Parser* p, Node* identifier) {
     Vector args = args_from_callee(p);
     return Call(p->yant_ctx, identifier, args, identifier->line, identifier->column);
+}
+
+/*
+ *
+ match(sum(30, 20)):string {
+   < 18 -> "nao permitido",
+   18   -> "permitido agora!",
+   _    -> "permitido"
+ }
+ *
+ */
+static Node* parse_match(Parser* p) {
+    Token match_tk    = advance(p);
+
+    expect(p, TOKEN_LEFT_PARENTHESES);
+    Node* subject = parse_expression(p);
+    expect(p, TOKEN_RIGHT_PARENTHESES);
+
+    expect(p, TOKEN_COLON);
+    if (!is_type(p)) {
+        Token bad = peek(p);
+        LOG_FATAL(
+            "expected type after match(...): got %s at %zu:%zu",
+            token_type_str(bad.type), bad.line, bad.column
+        );
+    }
+    Token return_type_tk = advance(p);
+
+    // { arms... }
+    Vector arms = vec_of(MatchArm);
+
+    expect(p, TOKEN_LEFT_BRACE);
+    while (!check(p, TOKEN_RIGHT_BRACE) && !is_eof(p)) {
+        MatchArm arm;
+        TokenType binop = TOKEN_EQEQ;
+
+        if (check(p, TOKEN_UNDERSCORE)) {
+            advance(p);
+            expect(p, TOKEN_ARROW);
+            Node* result = parse_expression(p);
+            arm = create_match_arm(NULL, result , TOKEN_EQEQ, true);
+        } else {
+            if (is_comparision_op(p) || is_equality_op(p)) binop = advance(p).type;
+            Node* pattern = parse_expression(p);
+            expect(p, TOKEN_ARROW);
+            Node* result  = parse_expression(p);
+
+            arm = create_match_arm(pattern, result, binop, false);
+        }
+
+        vec_push(&arms, &arm);
+        if (!check(p, TOKEN_RIGHT_BRACE)) expect(p, TOKEN_COMMA);
+    }
+    expect(p, TOKEN_RIGHT_BRACE);
+
+    if (arms.len == 0) {
+        LOG_FATAL("match must have at least one arm");
+    }
+
+    MatchArm* last = vec_ref(MatchArm, &arms, arms.len - 1);
+    if (!last->is_wildcard) {
+        LOG_FATAL("match must end with wildcard arm '_ -> ...'");
+    }
+
+    for (usize i = 0; i + 1 < arms.len; i++) {
+        MatchArm* a = vec_ref(MatchArm, &arms, i);
+        if (a->is_wildcard) {
+            LOG_FATAL("wildcard '_' must be the last arm");
+        }
+    }
+
+    return Matcher(p->yant_ctx, subject, arms, return_type_tk.type, match_tk.line, match_tk.column);
 }
 
 Vector parse(Parser* p) {

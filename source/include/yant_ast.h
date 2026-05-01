@@ -20,6 +20,7 @@ typedef struct Node Node;
     extends(NODE_IDENTIFIER,         "Node::Identifier")    \
     extends(NODE_BINARY_OP,          "Node::BinaryOp")      \
     extends(NODE_BLOCK,              "Node::Block")         \
+    extends(NODE_MATCH,              "Node::Match")         \
     extends(NODE_FNDECLARE,          "Node::FunctionDecl")  \
     extends(NODE_CALL,               "Node::Call")          \
     extends(NODE_DECLARATION,        "Node::Declaration")   \
@@ -48,13 +49,25 @@ typedef struct {
     TokenType   param_type;
 } Param;
 
-
 typedef struct {
     Vector      params; // vec_of(Param)
     StringSlice name;
     Node*       body;
     TokenType   return_type;
 } Function;
+
+typedef struct {
+    Vector    arms; // vec_of(MatchArm)
+    Node*     subject;
+    TokenType return_type;
+} Match;
+
+typedef struct {
+    Node*     arm_result;
+    Node*     pattern;
+    TokenType binop;
+    bool      is_wildcard;
+} MatchArm;
 
 struct Node {
     NodeType type;
@@ -110,6 +123,7 @@ struct Node {
         } generic_type;
 
         Function* function;
+        Match*    match;
     } as;
 };
 
@@ -125,6 +139,7 @@ Node* If             (YantContext* ctx, Node* base_cond, Node* then_cond, Node* 
 Node* Block          (YantContext* ctx, Vector statements, usize line, usize col);
 Node* FnDeclare      (YantContext* ctx, StringSlice name, Vector params, Node* body, TokenType return_type, usize line, usize col);
 Node* Call           (YantContext* ctx, Node* callee, Vector args, usize line, usize col);
+Node* Matcher        (YantContext* ctx, Node* subject, Vector arms, TokenType match_return_type, usize line, usize col);
 Node* Nil            (YantContext* ctx, usize line, usize col);
 Node* Eof            (YantContext* ctx, usize line, usize col);
 

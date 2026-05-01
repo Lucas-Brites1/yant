@@ -37,7 +37,7 @@ static ValueType expected_value_type(TokenType kind) {
         case TOKEN_TYPE_FLOAT:   return VALUE_FLOAT;
         case TOKEN_TYPE_STRING:  return VALUE_STRING;
         case TOKEN_TYPE_BOOLEAN: return VALUE_BOOL;
-        case TOKEN_TYPE_NIL:     return VALUE_NIL;
+        case TOKEN_NIL:          return VALUE_NIL;
         default:
             LOG_FATAL("invalid kind in declaration: %s", token_type_str(kind));
             return VALUE_NIL;
@@ -55,6 +55,7 @@ Value evaluate_conditional(Interpreter* i,  Node* n);
 Value evaluate_block      (Interpreter* i,  Node* n);
 Value evaluate_function_declaration(Interpreter* i, Node* n);
 Value evaluate_function_call(Interpreter* i,  Node* n);
+Value evaluate_match(Interpreter* i, Node* n);
 
 static inline Node* advance(Interpreter* i) {
     return vec_at(Node*, i->nodes, i->current++);
@@ -68,13 +69,14 @@ Value dispatcher(Interpreter* i, Node* n) {
         case NODE_LITERAL_BOOL:      return BooleanValue(n->as.boolean_literal.value);
         case NODE_LITERAL_NIL:       return NilValue();
         case NODE_BINARY_OP:         return evaluate_operation(i, n);
+        case NODE_IDENTIFIER:        return find_identifier(i, n);
         case NODE_DECLARATION:       return evaluate_declaration(i, n);
         case NODE_ASSIGNMENT:        return evaluate_assignment(i, n);
-        case NODE_IDENTIFIER:        return find_identifier(i, n);
         case NODE_IF:                return evaluate_conditional(i, n);
         case NODE_BLOCK:             return evaluate_block(i, n);
         case NODE_FNDECLARE:         return evaluate_function_declaration(i, n);
         case NODE_CALL:              return evaluate_function_call(i, n);
+        case NODE_MATCH:             return evaluate_match(i, n);
         default:
             LOG_DEBUG("WIP");
             return NilValue();
@@ -440,4 +442,50 @@ Value evaluate_function_call(Interpreter* i,  Node* n) {
 
 
     return callee_result;
+}
+
+Value evaluate_match(Interpreter* i, Node* n) {
+    Match* m = n->as.match;
+    Vector arms = m->arms;
+
+    Value result = NilValue();
+    bool matched = false;
+
+    for (usize idx = 0; idx < arms.len; idx++) {
+        MatchArm* arm = vec_ref(MatchArm, &arms, idx);
+
+        if (arm->is_wildcard) {
+            result = dispatcher(i, arm->arm_result);
+            matched = true;
+            break;
+        }
+
+        Node* binop = Operation(i->yant_ctx, arm->binop, m->subject, arm->pattern);
+        Value cmp   = evaluate_operation(i, binop);
+
+        if (cmp.type != VALUE_BOOL) {
+            LOG_FATAL("match arm comparison did not return boolean (internal bug)");
+        }
+
+        if (cmp.as_bool) {
+            result = dispatcher(i, arm->arm_result);
+            matched = true;
+            break;
+        }
+    }
+
+    if (!matched) {
+        LOG_FATAL("match: no arm matched (wildcard missing? internal bug)");
+    }
+
+    ValueType expected = expected_value_type(m->return_type);
+    if (result.type != expected) {
+        LOG_FATAL(
+            "match return type mismatch: expected %s, got %s",
+            value_type_str(expected),
+            value_type_str(result.type)
+        );
+    }
+
+    return result;
 }

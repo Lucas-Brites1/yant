@@ -10,17 +10,17 @@
 // | 1: Stringfied Label
 // | 2: Identifiers Matchers
 #define TOKENS_TABLE(extends) \
-    extends(TOKEN_TYPE_NIL,      "Type::Nil")     \
     extends(TOKEN_TYPE_INT,      "Type::Integer") \
     extends(TOKEN_TYPE_FLOAT,    "Type::Float")   \
     extends(TOKEN_TYPE_STRING,   "Type::String")  \
     extends(TOKEN_TYPE_BOOLEAN,  "Type::Boolean") \
     extends(TOKEN_TYPE_FUNCTION, "Type::Function")\
     \
-    extends(TOKEN_KEYWORD_SET,      "Keyword::Set")         \
-    extends(TOKEN_KEYWORD_FN,       "Keyword::FunctionDeclare")     \
-    extends(TOKEN_KEYWORD_IF,       "Keyword::If-Statement") \
-    extends(TOKEN_KEYWORD_COND,     "Keyword::Conditionals")\
+    extends(TOKEN_KEYWORD_SET,      "Keyword::Set")             \
+    extends(TOKEN_KEYWORD_FN,       "Keyword::FunctionDeclare") \
+    extends(TOKEN_KEYWORD_IF,       "Keyword::If-Statement")    \
+    extends(TOKEN_KEYWORD_COND,     "Keyword::Conditionals")    \
+    extends(TOKEN_KEYWORD_MATCH,    "Keyword::Match")           \
     \
     extends(TOKEN_COLON, "Syntax::Colon")                        \
     extends(TOKEN_RIGHT_PARENTHESES, "Syntax::RightParentheses") \
@@ -32,6 +32,8 @@
     extends(TOKEN_RIGHT_BRACE, "Syntax::RightBrace")             \
     extends(TOKEN_LEFT_BRACKET, "Syntax::LeftBracket")           \
     extends(TOKEN_RIGHT_BRACKET, "Syntax::RightBracket")         \
+    extends(TOKEN_UNDERSCORE,    "Syntax::Underscore")           \
+    extends(TOKEN_ARROW,  "Op::Arrow")                           \
     extends(TOKEN_PLUS,   "Op::Plus")                            \
     extends(TOKEN_MINUS,  "Op::Minus")                           \
     extends(TOKEN_STAR,   "Op::Star")                            \
@@ -55,6 +57,7 @@
     \
     extends(TOKEN_IDENTIFIER, "Ref::Identifier")       \
     extends(TOKEN_COMMENT,    "Special::Comment")      \
+    extends(TOKEN_NIL,      "Type::Nil")     \
     extends(TOKEN_EOF, "Special::Eof")
 
 #define X_AS_ENUM(label, str) label,
