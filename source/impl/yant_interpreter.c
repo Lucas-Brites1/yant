@@ -335,6 +335,10 @@ Value evaluate_declaration(Interpreter* i, Node* n) {
     Value     computed = dispatcher(i, n->as.declare.value);
     ValueType expected = expected_value_type(n->as.declare.kind);
 
+    if (expected == VALUE_FLOAT && computed.type == VALUE_INT) {
+        computed = FloatValue((f64)computed.as_int);
+    }
+
     if (computed.type != expected) {
         LOG_FATAL(
             "type mismatch in declaration of '" SS_FMT "': expected %s, got %s",

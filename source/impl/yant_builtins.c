@@ -15,6 +15,7 @@
     X(print)                 \
     X(input)                 \
     X(random_integer)        \
+    X(random_float)          \
     X(to_integer)            \
     X(to_float)              \
     X(to_string)             \
@@ -203,6 +204,39 @@ static Value builtin_random_integer(Interpreter* i, Vector* args) {
     i64 val = lo + (i64)(rand() % (hi - lo + 1));
 
     return IntegerValue(val);
+}
+
+static Value builtin_random_float(Interpreter* i, Vector* args) {
+    (void)i;
+    if (args->len != 2) {
+        LOG_FATAL("random_integer expects 2 arguments (min, max), got %zu", args->len);
+    }
+
+    Value min = *vec_ref(Value, args, 0);
+    Value max = *vec_ref(Value, args, 1);
+
+    if (min.type == VALUE_INT) {
+        min = FloatValue((f64)min.as_int);
+    }
+    if (max.type == VALUE_INT) {
+        max = FloatValue((f64)max.as_int);
+    }
+
+    if (min.type != VALUE_FLOAT || max.type != VALUE_FLOAT) {
+        LOG_FATAL("random_float: min and max must be float");
+    }
+
+    if (min.as_float > max.as_float) {
+        LOG_FATAL("random_float: min (%g) must be <= max (%g)",
+                  min.as_float, max.as_float);
+    }
+
+    f64 r = (f64)rand() / RAND_MAX;
+    f64 l = min.as_float;
+    f64 h = max.as_float;
+    f64 val = l + r * (h - l);
+
+    return FloatValue(val);
 }
 
 static Value builtin_sqrt(Interpreter* i, Vector* args) {
