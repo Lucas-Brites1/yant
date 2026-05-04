@@ -1,0 +1,7 @@
+print(sqrt(16))         // 4
+print(sqrt(2))          // 1.41421
+print(to_integer("42")) // 42
+print(to_float("3.14")) // 3.14
+print(to_string(42))    // 42
+print(random_integer(1, 10))   // [1, 10]
+print(input("name: "))

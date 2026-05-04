@@ -19,12 +19,15 @@ typedef struct Node Node;
     extends(NODE_IF,                 "Node::If")            \
     extends(NODE_IDENTIFIER,         "Node::Identifier")    \
     extends(NODE_BINARY_OP,          "Node::BinaryOp")      \
+    extends(NODE_UNARY_OP,           "Node::UnaryOp")       \
+    extends(NODE_LOOP,               "Node::Loop")          \
     extends(NODE_BLOCK,              "Node::Block")         \
     extends(NODE_MATCH,              "Node::Match")         \
     extends(NODE_FNDECLARE,          "Node::FunctionDecl")  \
     extends(NODE_CALL,               "Node::Call")          \
     extends(NODE_DECLARATION,        "Node::Declaration")   \
-    extends(NODE_ASSIGNMENT,         "Node::Assignment")
+    extends(NODE_ASSIGNMENT,         "Node::Assignment")    \
+    extends(NODE_BUILTIN,            "Node::Builtin")
 
 #define X_AS_ENUM(T, str) T,
 typedef enum {
@@ -69,6 +72,18 @@ typedef struct {
     bool      is_wildcard;
 } MatchArm;
 
+typedef struct {
+    Node* init;
+    Node* condition;
+    Node* step;
+    Node* body;
+} Loop;
+
+typedef struct {
+    StringSlice name;
+    Vector*     args;
+} Builtin;
+
 struct Node {
     NodeType type;
     usize    line;
@@ -85,6 +100,11 @@ struct Node {
             Node* left;
             Node* right;
         } binary;
+
+        struct {
+            TokenType unary_op;
+            Node* operand;
+        } unary;
 
         struct {
             TokenType   kind;
@@ -122,8 +142,10 @@ struct Node {
             Vector    typed_arguments;
         } generic_type;
 
+        Loop*     loop;
         Function* function;
         Match*    match;
+        Builtin*   builtin;
     } as;
 };
 
@@ -132,6 +154,7 @@ Node* LiteralFloat   (YantContext* ctx, f64 value, usize line, usize col);
 Node* LiteralString  (YantContext* ctx, StringSlice value, usize line, usize col);
 Node* LiteralBoolean (YantContext* ctx, bool value, usize line, usize col);
 Node* Identifier     (YantContext* ctx, StringSlice name, usize line, usize col);
+Node* Unary          (YantContext* ctx, TokenType unary_op, Node* operand, usize line, usize col);
 Node* Operation      (YantContext* ctx, TokenType op, Node* left, Node* right);
 Node* Declare        (YantContext* ctx, TokenType kind, StringSlice name, Node* value, usize line, usize col);
 Node* Assign         (YantContext* ctx, StringSlice name, Node* value, usize line, usize col);
@@ -140,6 +163,7 @@ Node* Block          (YantContext* ctx, Vector statements, usize line, usize col
 Node* FnDeclare      (YantContext* ctx, StringSlice name, Vector params, Node* body, TokenType return_type, usize line, usize col);
 Node* Call           (YantContext* ctx, Node* callee, Vector args, usize line, usize col);
 Node* Matcher        (YantContext* ctx, Node* subject, Vector arms, TokenType match_return_type, usize line, usize col);
+Node* Loopi          (YantContext* ctx, Node* init, Node* conditional, Node* step, Node* body, usize line, usize col);
 Node* Nil            (YantContext* ctx, usize line, usize col);
 Node* Eof            (YantContext* ctx, usize line, usize col);
 

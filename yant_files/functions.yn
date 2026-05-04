@@ -1,0 +1,5 @@
+fn:fatorial(integer:num):integer {
+    if (num == 0 or num == 1, num, num * fatorial(num - 1)
+}
+
+fatorial(5)

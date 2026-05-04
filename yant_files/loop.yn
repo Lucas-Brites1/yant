@@ -1,0 +1,7 @@
+boolean:running(true)
+integer:counter(0)
+loop (_, running, _) {
+    set:counter(counter + 1)
+    if (counter == 5, set:running(false), nil)
+}
+counter

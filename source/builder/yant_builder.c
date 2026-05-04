@@ -11,6 +11,9 @@ int main(int argc, char** argv) {
     moc_add_monitor(yant_moc, "./yant_files/*.yn");
 
     moc_set_optimization(yant_moc, MOC_OPT_NONE);
+
+    moc_add_library(yant_moc, "m");
+
     moc_watch_run_after_build(yant_moc, true);
     moc_dispatch(yant_moc, argc, argv);
     moc_end(&yant_moc);

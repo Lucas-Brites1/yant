@@ -14,14 +14,19 @@
 #include "./include/yant_strings.h"
 #include "./include/logc.h"
 #include "./include/blobberman.h"
+#include <time.h>
+#include <stdlib.h>
+#include <math.h>
 
 int main(void) {
+    srand(time(nil));
+
     logc_set_level(LOGC_DEBUG);
     logc_set_show_location(true);
     logc_set_show_time(false);
 
     YantContext ctx = yant_context_init(Kib_(50), Kib_(50), Kib_(50), Kib_(50));
-    Source      src = source_load("./yant_files/block.yn");
+    Source      src = source_load("./yant_files/testes.yn");
 
     Vector   tokens = tokenize(&src);
 

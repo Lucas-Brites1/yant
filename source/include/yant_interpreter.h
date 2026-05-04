@@ -7,12 +7,13 @@
 #include "yant_context.h"
 #include "logc.h"
 
-typedef struct {
+typedef struct Interpreter Interpreter;
+struct Interpreter {
     YantContext* yant_ctx;
     Vector*      nodes;
     Vector       scopes; // Vector<Map*>
     usize        current;
-} Interpreter;
+} ;
 
 Interpreter interpreter_create(YantContext* yant_context, Vector* nodes);
 void        interpreter_free(Interpreter* i);

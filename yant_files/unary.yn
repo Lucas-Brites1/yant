@@ -1,0 +1,14 @@
+integer:a(-5)
+integer:b(-3 + 10)
+integer:x(10)
+integer:c(-x)
+integer:d(5 * -3)
+integer:e(5 - -3)
+float:f(-3.14)
+
+a
+b
+c
+d
+e
+f

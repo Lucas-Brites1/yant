@@ -19,8 +19,8 @@
     extends(TOKEN_KEYWORD_SET,      "Keyword::Set")             \
     extends(TOKEN_KEYWORD_FN,       "Keyword::FunctionDeclare") \
     extends(TOKEN_KEYWORD_IF,       "Keyword::If-Statement")    \
-    extends(TOKEN_KEYWORD_COND,     "Keyword::Conditionals")    \
     extends(TOKEN_KEYWORD_MATCH,    "Keyword::Match")           \
+    extends(TOKEN_KEYWORD_LOOP,     "Keyword::Loop")            \
     \
     extends(TOKEN_COLON, "Syntax::Colon")                        \
     extends(TOKEN_RIGHT_PARENTHESES, "Syntax::RightParentheses") \

@@ -31,6 +31,23 @@ static inline Match*  alloc_new_match(Blob *ast_blob) {
     return match;
 }
 
+static inline Loop*  alloc_new_loop(Blob* ast_blob) {
+    LOG_ASSERT(ast_blob, "Failed due to invalid pointer as ast blob");
+    Loop* loop = (Loop*)blob_reserve(ast_blob, sizeof(Loop));
+    LOG_ASSERT(loop, "Failed trying to allocate new match");
+    return loop;
+}
+
+static inline Builtin* alloc_new_builtin(Blob* ast_blob) {
+    LOG_ASSERT(ast_blob, "Failed due to invalid pointer as ast blob");
+    Builtin* builtin = (Builtin*)blob_reserve(ast_blob, sizeof(Builtin));
+    LOG_ASSERT(builtin, "Failed trying to allocate new match");
+    return builtin;
+}
+
+
+//  Node constructors
+
 Node* LiteralInteger (YantContext* ctx, i64 value, usize line, usize col) {
     Node* n = alloc_new_node(ctx->ast, NODE_LITERAL_INTEGER, line, col);
     n->as.int_literal.value = value;
@@ -105,6 +122,18 @@ Node* Call           (YantContext* ctx, Node* callee, Vector args, usize line, u
     return n;
 }
 
+Node* Loopi          (YantContext* ctx, Node* init, Node* conditional, Node* step, Node* body, usize line, usize col) {
+    Node* n = alloc_new_node(ctx->ast, NODE_LOOP, line, col);
+    Loop* loop = alloc_new_loop(ctx->ast);
+
+    loop->init = init;
+    loop->condition = conditional;
+    loop->step = step;
+    loop->body = body;
+    n->as.loop = loop;
+    return n;
+}
+
 Node* Nil            (YantContext* ctx, usize line, usize col) {
     Node*n = alloc_new_node(ctx->ast, NODE_LITERAL_NIL, line, col);
     return n;
@@ -133,6 +162,21 @@ Node* Matcher          (YantContext* ctx, Node* subject, Vector arms, TokenType 
     return n;
 }
 
+Node* BuiltinFn      (YantContext* ctx, StringSlice name, Vector args, usize line, usize col) {
+    Node*    n = alloc_new_node(ctx->ast, NODE_BUILTIN, line, col);
+    Builtin* b = alloc_new_builtin(ctx->ast);
+    b->name = name;
+    b->args = &args;
+    n->as.builtin = b;
+    return n;
+}
+
+Node* Unary          (YantContext* ctx, TokenType unary_op, Node* operand, usize line, usize col) {
+    Node* n = alloc_new_node(ctx->ast, NODE_UNARY_OP, line, col);
+    n->as.unary.operand = operand;
+    n->as.unary.unary_op = unary_op;
+    return n;
+}
 
 void node_print(Node* n, int depth) {
     for (int i = 0; i < depth * 2; i++) putchar(' ');
@@ -170,6 +214,27 @@ void node_print(Node* n, int depth) {
             );
             node_print(n->as.declare.value, depth + 1);
             break;
+        case NODE_LOOP: {
+            Loop* l = n->as.loop;
+            printf("%s\n", node_type_str(t));
+
+            printf("%*sinit:\n", (depth + 1) * 2, "");
+            if (l->init) node_print(l->init, depth + 2);
+            else printf("%*s(none)\n", (depth + 2) * 2, "");
+
+            printf("%*scondition:\n", (depth + 1) * 2, "");
+            node_print(l->condition, depth + 2);
+
+            printf("%*sstep:\n", (depth + 1) * 2, "");
+            if (l->step) node_print(l->step, depth + 2);
+            else printf("%*s(none)\n", (depth + 2) * 2, "");
+
+            printf("%*sbody:\n", (depth + 1) * 2, "");
+            node_print(l->body, depth + 2);
+
+            break;
+        }
+
         case NODE_ASSIGNMENT:
             printf("%s(" SS_FMT ")\n", node_type_str(t), SS_ARG(n->as.assign.name));
             node_print(n->as.assign.value, depth + 1);
@@ -252,6 +317,13 @@ void node_free(Node* n) {
                 node_free(arm->arm_result);
             }
             vec_free(&arms);
+            break;
+        case NODE_LOOP:
+            Loop* loop = n->as.loop;
+            if (loop->init) node_free(loop->init);
+            node_free(loop->condition);
+            if (loop->step) node_free(loop->step);
+            node_free(loop->body);
             break;
         case NODE_CALL:
             node_free(n->as.call.callee);

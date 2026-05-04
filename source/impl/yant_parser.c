@@ -13,9 +13,11 @@ static Node* parse_declaration(Parser* p);
 static Node* parse_assignment(Parser* p);
 static Node* parse_conditional(Parser* p);
 static Node* parse_block(Parser* p);
+static Node* parse_loop(Parser* p);
 static Node* parse_function_declaration(Parser* p);
 static Node* parse_call(Parser* p, Node* identifier);
 static Node* parse_match(Parser* p);
+static Node* parse_builtin(Parser* p);
 
 // Expression Functions
 static Node* parse_expression(Parser* p); // dispatcher
@@ -25,6 +27,7 @@ static Node* parse_equality(Parser* p);
 static Node* parse_comparison(Parser* p);
 static Node* parse_addition(Parser* p);
 static Node* parse_multiplication(Parser* p);
+static Node* parse_unary(Parser* p);
 static Node* parse_primary(Parser* p);
 
 static inline Token peek(Parser* p) {
@@ -123,8 +126,8 @@ static inline bool is_statement_keyword(Parser* p) {
         TOKEN_KEYWORD_SET,
         TOKEN_KEYWORD_FN,
         TOKEN_KEYWORD_IF,
-        TOKEN_KEYWORD_MATCH
-        //TOKEN_KEYWORD_LOOP
+        TOKEN_KEYWORD_MATCH,
+        TOKEN_KEYWORD_LOOP
     );
 }
 
@@ -132,7 +135,6 @@ static inline bool is_conditional_keyword(Parser* p) {
     return TYPE_IN(
         peek(p).type,
         TOKEN_KEYWORD_IF,
-        TOKEN_KEYWORD_COND
     );
 }
 
@@ -167,6 +169,14 @@ static inline bool is_multiplication_op(Parser* p) {
         peek(p).type,
         TOKEN_STAR,
         TOKEN_SLASH
+    );
+}
+
+static inline bool is_unary_op(Parser* p) {
+    return TYPE_IN(
+        peek(p).type,
+        TOKEN_MINUS,
+        TOKEN_NOT
     );
 }
 
@@ -282,16 +292,42 @@ static Node* parse_addition(Parser* p) {
 }
 
 static Node* parse_multiplication(Parser* p) {
-    Node* left = parse_primary(p);
+    Node* left = parse_unary(p);
 
     while (is_multiplication_op(p)) {
         Token op    = advance(p);
-        Node* right = parse_primary(p);
+        Node* right = parse_unary(p);
 
         left = Operation(p->yant_ctx, op.type, left, right);
     }
 
     return left;
+}
+
+static Node* parse_unary(Parser* p) {
+    if (is_unary_op(p)) {
+        Token op = advance(p);
+        Node* operand = parse_unary(p);
+
+        if (op.type == TOKEN_MINUS) {
+            if (operand->type == NODE_LITERAL_INTEGER) {
+                operand->as.int_literal.value = -operand->as.int_literal.value;
+                return operand;
+            }
+            if (operand->type == NODE_LITERAL_FLOAT) {
+                operand->as.float_literal.value = -operand->as.float_literal.value;
+                return operand;
+            }
+            if (op.type == TOKEN_NOT && operand->type == NODE_LITERAL_BOOL) {
+                operand->as.boolean_literal.value = !operand->as.boolean_literal.value;
+                return operand;
+            }
+        }
+
+        return Unary(p->yant_ctx, op.type, operand, op.line, op.column);
+    }
+
+    return parse_primary(p);
 }
 
 static Node* parse_primary(Parser* p) {
@@ -342,6 +378,10 @@ static Node* parse_primary(Parser* p) {
         Node* match = parse_match(p);
         return match;
     }
+    if (check(p, TOKEN_KEYWORD_SET)) {
+        Node* assignment = parse_assignment(p);
+        return assignment;
+    }
 
     Token t = peek(p);
     LOG_FATAL("expected expression, got %s at line %zu column %zu",
@@ -364,7 +404,6 @@ static Node* parse_conditional(Parser* p) {
             expect(p, TOKEN_RIGHT_PARENTHESES);
             return If(p->yant_ctx, base_cond, then_cond, else_cond, cond_tk.line, cond_tk.column);
         }
-        case TOKEN_KEYWORD_COND: TODO();
         default: UNREACHABLE();
     }
 }
@@ -376,6 +415,7 @@ static Node* parse_statement(Parser* p) {
         if (check(p, TOKEN_KEYWORD_SET))   return parse_assignment(p);
         if (check(p, TOKEN_KEYWORD_FN))    return parse_function_declaration(p);
         if (check(p, TOKEN_KEYWORD_MATCH)) return parse_match(p);
+        if (check(p, TOKEN_KEYWORD_LOOP))  return parse_loop(p);
 
         Token tk = peek(p);
         TODO("implement %s", token_type_str(tk.type));
@@ -418,6 +458,29 @@ static Node* parse_block(Parser* p) {
     expect(p, TOKEN_RIGHT_BRACE);
 
     return Block(p->yant_ctx, statements, lbrace.line, lbrace.column);
+}
+
+// loop (integer:x(0), x < 100, set:x(x + 1)) { ... }  // ainda funciona
+static Node* parse_loop(Parser* p) {
+    Token loop_tk = advance(p);
+    expect(p, TOKEN_LEFT_PARENTHESES);
+
+    Node* init = nil;
+    if (check(p, TOKEN_UNDERSCORE)) advance(p);
+    else if (is_type(p)) init = parse_declaration(p);
+    else init = parse_expression(p);
+    expect(p, TOKEN_COMMA);
+
+    Node* cond  = parse_expression(p);
+    expect(p, TOKEN_COMMA);
+
+    Node* step  = NULL;
+    if (check(p, TOKEN_UNDERSCORE)) advance(p);
+    else step = parse_expression(p);
+    expect(p, TOKEN_RIGHT_PARENTHESES);
+
+    Node* body  = parse_block(p);
+    return Loopi(p->yant_ctx, init, cond, step, body, loop_tk.line, loop_tk.column);
 }
 
 static Node* parse_function_declaration(Parser* p) {
